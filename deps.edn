@@ -1,0 +1,27 @@
+{:paths ["src/clj" "resources"]
+
+ :deps {org.clojure/clojure {:mvn/version "1.11.1"}}
+
+ :aliases
+ {:dev {:extra-paths ["dev"]}
+
+  ;; ClojureScript compilation
+  :cljs {:extra-deps {org.clojure/clojurescript {:mvn/version "1.11.132"}
+                      reagent/reagent {:mvn/version "1.2.0"}
+                      com.cleancoders.c3kit/scaffold {:mvn/version "1.0.10"}}
+         :extra-paths ["src/cljs"]}
+
+  ;; Desktop GUI with HumbleUI
+  :gui {:extra-deps {io.github.humbleui/humbleui {:git/url "https://github.com/HumbleUI/HumbleUI.git"
+                                                   :git/sha "89d7ab0fffdd2f013f066a3bd766f0a7254412dc"}}
+        :extra-paths ["src/gui"]
+        :main-opts ["-m" "pendulums.gui"]}
+
+  ;; JVM specs with Speclj
+  :spec {:extra-deps {speclj/speclj {:mvn/version "3.4.8"}}
+         :extra-paths ["spec/clj"]
+         :main-opts ["-m" "speclj.main" "-c"]}
+
+  ;; CLJS specs
+  :test {:extra-deps {speclj/speclj {:mvn/version "3.4.8"}}
+         :extra-paths ["spec/cljs"]}}}

@@ -1,3 +1,10 @@
 # bv (beads viewer) local config and caches
 .bv/
 /.idea
+
+# Clojure
+.cpcache/
+.nrepl-port
+target/
+out/
+.cljs_nashorn_repl/
