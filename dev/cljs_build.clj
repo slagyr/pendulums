@@ -3,7 +3,7 @@
   (:require [cljs.build.api :as cljs]))
 
 (def build-opts
-  {:main 'pendulums.core
+  {:main 'com.micahmartin.pendulums.core
    :output-to "web/cljs/pendulums.js"
    :output-dir "web/cljs/out"
    :asset-path "cljs/out"
@@ -11,7 +11,7 @@
    :source-map true})
 
 (def prod-opts
-  {:main 'pendulums.core
+  {:main 'com.micahmartin.pendulums.core
    :output-to "web/cljs/pendulums.js"
    :output-dir "web/cljs/out"
    :optimizations :advanced})
