@@ -15,7 +15,7 @@ to the bob of the last pendulum.  Arms are weightless and the bob of each pendul
 - Language: Clojure
 - Unit Testing: Speclj
 - Web Framework: Reagent with c3kit/scaffold
-- GUI Framework: HumbleIUI
+- GUI Framework: Swing
 
 ## Architecture
 

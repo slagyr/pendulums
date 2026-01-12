@@ -184,12 +184,6 @@
 ;; Animation
 ;; -----------------------------------------------------------------------------
 
-(defn request-animation-frame!
-  "Request next animation frame when simulation is running."
-  []
-  (when (:running @*state)
-    (step-simulation!)
-    (some-> @*window window/request-frame)))
 
 ;; -----------------------------------------------------------------------------
 ;; UI Components
@@ -221,9 +215,12 @@
                    (.clear canvas bg-color)
                    (draw-pendulum-system canvas system selected running))}]]))
 
+(defn on-frame [window]
+  (when (:running @*state)
+    (step-simulation!))
+  (window/request-frame window))
+
 (defn app []
-  ;; Step simulation and request next frame if running
-  (request-animation-frame!)
   (let [{:keys [running system]} @*state
         n (engine/pendulum-count system)
         energy (engine/total-energy system)]
@@ -255,7 +252,8 @@
       (ui/window
         {:title "Pendulums"
          :width canvas-width
-         :height (+ canvas-height 60)}
+         :height (+ canvas-height 60)
+         :on-frame on-frame}
         #'app)))
   ;; Block main thread to keep app alive
   @(promise))
