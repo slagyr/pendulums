@@ -15,8 +15,8 @@
 (def pivot-y 150)
 (def dt 0.016)  ; ~60 fps simulation step
 
-;; Colors for pendulum chain
-(def colors ["#5c7aea" "#7c9afa" "#9cbafa" "#bcdafa" "#dcfafa"])
+;; Colors for pendulum chain (warm sunset gradient)
+(def colors ["#ef4444" "#f97316" "#eab308" "#84cc16" "#22c55e"])
 
 ;; -----------------------------------------------------------------------------
 ;; Application State
@@ -173,7 +173,7 @@
               is-selected (and (not running) (= idx selected))]
 
           ;; Draw arm
-          (set! (.-strokeStyle ctx) "#6a6e89")
+          (set! (.-strokeStyle ctx) "#525252")
           (set! (.-lineWidth ctx) 3)
           (.beginPath ctx)
           (.moveTo ctx prev-x prev-y)
@@ -201,7 +201,7 @@
           (recur screen-x screen-y (inc idx) (rest bobs)))))
 
     ;; Draw pivot point
-    (set! (.-fillStyle ctx) "#9a9aba")
+    (set! (.-fillStyle ctx) "#737373")
     (.beginPath ctx)
     (.arc ctx pivot-x pivot-y 6 0 (* 2 js/Math.PI))
     (.fill ctx)))

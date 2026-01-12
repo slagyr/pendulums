@@ -16,15 +16,16 @@
 (def pivot-y 150.0)
 (def dt 0.016)
 
-(def colors [(unchecked-int 0xFF5c7aea) (unchecked-int 0xFF7c9afa)
-             (unchecked-int 0xFF9cbafa) (unchecked-int 0xFFbcdafa)
-             (unchecked-int 0xFFdcfafa)])
-(def arm-color (unchecked-int 0xFF6a6e89))
+;; Warm Physics color palette
+(def colors [(unchecked-int 0xFFef4444) (unchecked-int 0xFFf97316)
+             (unchecked-int 0xFFeab308) (unchecked-int 0xFF84cc16)
+             (unchecked-int 0xFF22c55e)])
+(def arm-color (unchecked-int 0xFF525252))
 (def bob-outline-color (unchecked-int 0xFFffffff))
-(def selected-outline-color (unchecked-int 0xFFffcc00))
-(def pivot-color (unchecked-int 0xFF9a9aba))
-(def bg-color (unchecked-int 0xFF1a1a2e))
-(def btn-color (unchecked-int 0xFF3a3a5e))
+(def selected-outline-color (unchecked-int 0xFFf59e0b))
+(def pivot-color (unchecked-int 0xFF737373))
+(def bg-color (unchecked-int 0xFF121212))
+(def btn-color (unchecked-int 0xFF404040))
 
 ;; -----------------------------------------------------------------------------
 ;; Application State
