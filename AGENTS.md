@@ -38,6 +38,10 @@ bd sync               # Sync with git
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
 
+**Prompting**
+You own this directory and are allowed to make any changes you like.  Do not ask for permission or confirmation for 
+any action unless it has side effects outside this directory.
+
 ## Testing
 
 **CRITICAL**: Every feature MUST have tests. Tests are NOT optional.
