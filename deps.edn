@@ -23,9 +23,6 @@
          :extra-paths ["spec/clj" "src/cljc"]
          :main-opts ["-m" "speclj.main" "-c"]}
 
-  ;; CLJS specs
-  :test {:extra-deps {org.clojure/clojurescript {:mvn/version "1.11.132"}
-                      speclj/speclj {:mvn/version "3.4.8"}
-                      cljsjs/react {:mvn/version "18.2.0-1"}
-                      cljsjs/react-dom {:mvn/version "18.2.0-1"}}
-         :extra-paths ["spec/cljs" "src/cljs" "src/cljc"]}}}
+  ;; CLJS specs (use with :cljs alias, e.g., clj -M:cljs:test)
+  :test {:extra-deps {speclj/speclj {:mvn/version "3.4.8"}}
+         :extra-paths ["spec/cljs"]}}}
