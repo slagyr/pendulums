@@ -1,4 +1,4 @@
-(ns pendulums.engine
+(ns com.micahmartin.pendulums.engine
   "Physics engine for coupled pendulum simulation.
    This namespace contains pure functions for pendulum mechanics.
 
@@ -6,7 +6,8 @@
    - Origin at the root pivot point
    - Positive x to the right
    - Positive y downward (for computational convenience)
-   - Angles measured from vertical (hanging down), positive clockwise")
+   - Angles measured from vertical (hanging down), positive clockwise"
+  (:require [com.micahmartin.pendulums.math :as math]))
 
 (def ^:const default-gravity 9.81)
 
@@ -53,8 +54,8 @@
     (if (empty? pends)
       positions
       (let [{:keys [theta length]} (first pends)
-            new-x (+ x (* length (Math/sin theta)))
-            new-y (- y (* length (Math/cos theta)))]
+            new-x (+ x (* length (math/sin theta)))
+            new-y (- y (* length (math/cos theta)))]
         (recur (rest pends)
                new-x
                new-y
@@ -84,8 +85,8 @@
               {:keys [mass]} (nth pendulums i)
               [vx vy] (reduce (fn [[vx vy] j]
                                 (let [{:keys [theta omega length]} (nth pendulums j)]
-                                  [(+ vx (* length (Math/cos theta) omega))
-                                   (+ vy (* length (Math/sin theta) omega))]))
+                                  [(+ vx (* length (math/cos theta) omega))
+                                   (+ vy (* length (math/sin theta) omega))]))
                               [0.0 0.0]
                               (range (inc i)))
               v-squared (+ (* vx vx) (* vy vy))
@@ -115,7 +116,7 @@
   "Calculates angular acceleration for a single pendulum.
    alpha = -g/L * sin(theta)"
   [{:keys [gravity]} {:keys [theta length]}]
-  (- (/ (* gravity (Math/sin theta)) length)))
+  (- (/ (* gravity (math/sin theta)) length)))
 
 (defn- n-pendulum-accelerations
   "Calculates angular accelerations for n coupled pendulums.
@@ -140,7 +141,7 @@
                           (* mass-sum
                              (nth lengths i)
                              (nth lengths j)
-                             (Math/cos delta)))))))
+                             (math/cos delta)))))))
 
         ;; Build force vector F
         ;; F_i = -sum(m_k for k >= i) * g * L_i * sin(theta_i)
@@ -149,7 +150,7 @@
                  (let [grav-term (- (* (nth mass-sums i)
                                        gravity
                                        (nth lengths i)
-                                       (Math/sin (nth thetas i))))
+                                       (math/sin (nth thetas i))))
                        vel-terms (reduce + (for [j (range n)
                                                  :when (not= i j)]
                                              (let [k-max (max i j)
@@ -157,8 +158,8 @@
                                                (- (* (nth mass-sums k-max)
                                                      (nth lengths i)
                                                      (nth lengths j)
-                                                     (Math/pow (nth omegas j) 2)
-                                                     (Math/sin delta))))))]
+                                                     (math/pow (nth omegas j) 2)
+                                                     (math/sin delta))))))]
                    (+ grav-term vel-terms))))
 
         ;; Solve M * alpha = F using Gaussian elimination
@@ -173,14 +174,14 @@
                   (if (>= k n)
                     aug
                     (let [;; Partial pivoting
-                          pivot-row (apply max-key #(Math/abs (get-in aug [% k])) (range k n))
+                          pivot-row (apply max-key #(math/abs (get-in aug [% k])) (range k n))
                           aug (if (= pivot-row k)
                                 aug
                                 (-> aug
                                     (assoc k (nth aug pivot-row))
                                     (assoc pivot-row (nth aug k))))
                           pivot-val (get-in aug [k k])]
-                      (if (< (Math/abs pivot-val) 1e-10)
+                      (if (< (math/abs pivot-val) 1e-10)
                         aug  ; Singular matrix, return as is
                         (let [aug (reduce (fn [a i]
                                             (let [factor (/ (get-in a [i k]) pivot-val)]
@@ -298,4 +299,3 @@
   "Returns the number of pendulums in the system."
   [sys]
   (count (:pendulums sys)))
-

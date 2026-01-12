@@ -1,4 +1,4 @@
-{:paths ["src/clj" "resources"]
+{:paths ["src/clj" "src/cljc" "resources"]
 
  :deps {org.clojure/clojure {:mvn/version "1.11.1"}}
 
@@ -8,20 +8,24 @@
   ;; ClojureScript compilation
   :cljs {:extra-deps {org.clojure/clojurescript {:mvn/version "1.11.132"}
                       reagent/reagent {:mvn/version "1.2.0"}
+                      cljsjs/react {:mvn/version "18.2.0-1"}
+                      cljsjs/react-dom {:mvn/version "18.2.0-1"}
                       com.cleancoders.c3kit/scaffold {:mvn/version "1.0.10"}}
-         :extra-paths ["src/cljs"]}
+         :extra-paths ["src/cljs" "src/cljc"]}
 
   ;; Desktop GUI with HumbleUI
   :gui {:extra-deps {io.github.humbleui/humbleui {:git/url "https://github.com/HumbleUI/HumbleUI.git"
                                                    :git/sha "89d7ab0fffdd2f013f066a3bd766f0a7254412dc"}}
-        :extra-paths ["src/gui"]
-        :main-opts ["-m" "pendulums.gui"]}
+        :main-opts ["-m" "com.micahmartin.pendulums.gui"]}
 
   ;; JVM specs with Speclj
   :spec {:extra-deps {speclj/speclj {:mvn/version "3.4.8"}}
-         :extra-paths ["spec/clj"]
+         :extra-paths ["spec/clj" "src/cljc"]
          :main-opts ["-m" "speclj.main" "-c"]}
 
   ;; CLJS specs
-  :test {:extra-deps {speclj/speclj {:mvn/version "3.4.8"}}
-         :extra-paths ["spec/cljs"]}}}
+  :test {:extra-deps {org.clojure/clojurescript {:mvn/version "1.11.132"}
+                      speclj/speclj {:mvn/version "3.4.8"}
+                      cljsjs/react {:mvn/version "18.2.0-1"}
+                      cljsjs/react-dom {:mvn/version "18.2.0-1"}}
+         :extra-paths ["spec/cljs" "src/cljs" "src/cljc"]}}}

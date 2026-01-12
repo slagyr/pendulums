@@ -1,6 +1,6 @@
-(ns pendulums.engine-spec
+(ns com.micahmartin.pendulums.engine-spec
   (:require [speclj.core :refer :all]
-            [pendulums.engine :as engine]))
+            [com.micahmartin.pendulums.engine :as engine]))
 
 (def ^:const g 9.81)
 (def ^:const tolerance 0.0001)
