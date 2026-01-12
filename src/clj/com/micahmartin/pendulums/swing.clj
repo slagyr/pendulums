@@ -4,7 +4,7 @@
   (:import [java.awt Color Graphics2D RenderingHints BasicStroke Dimension BorderLayout]
            [java.awt.event MouseAdapter MouseMotionAdapter ActionListener]
            [java.awt.geom Ellipse2D$Double Line2D$Double]
-           [javax.swing JFrame JPanel JButton Timer SwingUtilities]))
+           [javax.swing JFrame JPanel JButton Timer SwingUtilities UIManager]))
 
 ;; -----------------------------------------------------------------------------
 ;; Constants
@@ -193,6 +193,9 @@
 
 (defn create-button [label on-click]
   (doto (JButton. label)
+    (.setOpaque true)
+    (.setContentAreaFilled true)
+    (.setBorderPainted true)
     (.setBackground btn-bg-color)
     (.setForeground btn-fg-color)
     (.setFocusPainted false)
@@ -249,6 +252,10 @@
 ;; -----------------------------------------------------------------------------
 
 (defn -main [& _args]
+  ;; Use cross-platform L&F for consistent button styling
+  (try
+    (UIManager/setLookAndFeel (UIManager/getCrossPlatformLookAndFeelClassName))
+    (catch Exception _))
   (SwingUtilities/invokeLater
     (fn []
       (let [frame (JFrame. "Pendulums")
