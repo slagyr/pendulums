@@ -20,9 +20,9 @@
 
   ;; JVM specs with Speclj
   :spec {:extra-deps {speclj/speclj {:mvn/version "3.4.8"}}
-         :extra-paths ["spec/clj" "src/cljc"]
+         :extra-paths ["spec/cljc" "src/cljc"]
          :main-opts ["-m" "speclj.main" "-c"]}
 
   ;; CLJS specs (use with :cljs alias, e.g., clj -M:cljs:test)
   :test {:extra-deps {speclj/speclj {:mvn/version "3.4.8"}}
-         :extra-paths ["spec/cljs"]}}}
+         :extra-paths ["spec/cljc"]}}}
