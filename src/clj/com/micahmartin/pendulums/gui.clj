@@ -1,9 +1,9 @@
 (ns com.micahmartin.pendulums.gui
   "Desktop GUI using HumbleUI for coupled pendulum simulation."
   (:require [com.micahmartin.pendulums.engine :as engine]
-            [io.github.humbleui.ui :as ui])
-  (:import [io.github.humbleui.skija Canvas Paint PaintMode]
-           [io.github.humbleui.types IPoint]))
+            [io.github.humbleui.ui :as ui]
+            [io.github.humbleui.window :as window])
+  (:import [io.github.humbleui.skija Canvas Paint PaintMode]))
 
 ;; -----------------------------------------------------------------------------
 ;; Constants
@@ -16,11 +16,14 @@
 (def pivot-y 150.0)
 (def dt 0.016)  ; ~60 fps simulation step
 
-;; Colors for pendulum chain (ARGB format)
-(def colors [0xFF5c7aea 0xFF7c9afa 0xFF9cbafa 0xFFbcdafa 0xFFdcfafa])
-(def arm-color 0xFF6a6e89)
-(def bob-outline-color 0xFFffffff)
-(def pivot-color 0xFF9a9aba)
+;; Colors for pendulum chain (ARGB format - use unchecked-int for Java interop)
+(def colors [(unchecked-int 0xFF5c7aea) (unchecked-int 0xFF7c9afa)
+             (unchecked-int 0xFF9cbafa) (unchecked-int 0xFFbcdafa)
+             (unchecked-int 0xFFdcfafa)])
+(def arm-color (unchecked-int 0xFF6a6e89))
+(def bob-outline-color (unchecked-int 0xFFffffff))
+(def pivot-color (unchecked-int 0xFF9a9aba))
+(def bg-color (unchecked-int 0xFF1a1a2e))
 
 ;; -----------------------------------------------------------------------------
 ;; Application State
@@ -99,59 +102,55 @@
 ;; UI Components
 ;; -----------------------------------------------------------------------------
 
-(def simulation-canvas
-  (ui/canvas
-    {:on-paint (fn [_ ^Canvas canvas _size]
-                 (.clear canvas 0xFF1a1a2e)
-                 (draw-pendulum-system canvas (:system @*state)))}))
+(ui/defcomp simulation-canvas []
+  [ui/canvas
+   {:on-paint (fn [_ctx ^Canvas canvas _size]
+                (.clear canvas bg-color)
+                (draw-pendulum-system canvas (:system @*state)))}])
 
-(defn button [label on-click]
-  (ui/clickable
-    {:on-click (fn [_] (on-click))}
-    (ui/rect (Paint.) ; will be styled
-      (ui/padding 10 5
-        (ui/label label)))))
+(ui/defcomp button [label on-click]
+  [ui/clickable
+   {:on-click (fn [_] (on-click))}
+   [ui/padding {:padding 10}
+    [ui/label label]]])
 
-(def controls
-  (ui/dynamic _ctx [state @*state]
-    (let [{:keys [running system]} state
-          n (engine/pendulum-count system)
-          energy (engine/total-energy system)]
-      (ui/row
-        (ui/gap 10 0)
-        (button (if running "Pause" "Play") toggle-simulation!)
-        (ui/gap 10 0)
-        (button "Reset" reset-simulation!)
-        (ui/gap 10 0)
-        (button "+ Pendulum" add-pendulum!)
-        (ui/gap 10 0)
-        (button "- Pendulum" remove-pendulum!)
-        (ui/gap 20 0)
-        (ui/label (str "Pendulums: " n))
-        (ui/gap 20 0)
-        (ui/label (format "Energy: %.2f J" energy))))))
+(ui/defcomp controls []
+  (let [{:keys [running system]} @*state
+        n (engine/pendulum-count system)
+        energy (engine/total-energy system)]
+    [ui/row
+     [ui/gap {:width 10}]
+     [button (if running "Pause" "Play") toggle-simulation!]
+     [ui/gap {:width 10}]
+     [button "Reset" reset-simulation!]
+     [ui/gap {:width 10}]
+     [button "+ Pendulum" add-pendulum!]
+     [ui/gap {:width 10}]
+     [button "- Pendulum" remove-pendulum!]
+     [ui/gap {:width 20}]
+     [ui/label (str "Pendulums: " n)]
+     [ui/gap {:width 20}]
+     [ui/label (format "Energy: %.2f J" energy)]]))
 
-(def app
-  (ui/default-theme {}
-    (ui/column
-      (ui/rect (doto (Paint.) (.setColor 0xFF1a1a2e))
-        (ui/width canvas-width
-          (ui/height canvas-height
-            simulation-canvas)))
-      (ui/gap 0 10)
-      (ui/center
-        controls))))
+(ui/defcomp app []
+  [ui/column
+   [ui/rect {:paint (doto (Paint.) (.setColor bg-color))}
+    [ui/size {:width canvas-width :height canvas-height}
+     [simulation-canvas]]]
+   [ui/gap {:height 10}]
+   [ui/center
+    [controls]]])
 
 ;; -----------------------------------------------------------------------------
 ;; Animation Loop
 ;; -----------------------------------------------------------------------------
 
-(defn animation-loop [window]
-  (when window
-    (when (:running @*state)
-      (step-simulation!))
-    (ui/schedule-frame window)
-    (.requestFrame window)))
+(defonce *window (atom nil))
+
+(defn on-frame [window]
+  (when (:running @*state)
+    (step-simulation!))
+  (window/request-frame window))
 
 ;; -----------------------------------------------------------------------------
 ;; Entry Point
@@ -159,9 +158,10 @@
 
 (defn -main [& _args]
   (ui/start-app!
-    (ui/window
-      {:title "Pendulums"
-       :width (+ canvas-width 40)
-       :height (+ canvas-height 100)
-       :on-frame animation-loop}
-      app)))
+    (reset! *window
+      (ui/window
+        {:title "Pendulums"
+         :width (+ canvas-width 40)
+         :height (+ canvas-height 100)
+         :on-frame on-frame}
+        #'app))))
