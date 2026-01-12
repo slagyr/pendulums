@@ -13,8 +13,8 @@
                       com.cleancoders.c3kit/scaffold {:mvn/version "1.0.10"}}
          :extra-paths ["src/cljs" "src/cljc"]}
 
-  ;; Desktop GUI with Swing (no extra dependencies)
-  :swing {:main-opts ["-m" "com.micahmartin.pendulums.swing"]}
+  ;; Desktop GUI with Swing
+  :gui {:main-opts ["-m" "com.micahmartin.pendulums.swing"]}
 
   ;; JVM specs with Speclj
   :spec {:extra-deps {speclj/speclj {:mvn/version "3.12.0"}}
