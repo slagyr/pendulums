@@ -27,7 +27,9 @@
                      [(engine/make-pendulum {:theta 0.8 :length 1.5})
                       (engine/make-pendulum {:theta 0.5 :length 1.2})])
            :running false
-           :animation-id nil}))
+           :animation-id nil
+           :selected nil      ; index of selected pendulum (nil = none)
+           :dragging false})) ; true when dragging to adjust angle
 
 ;; -----------------------------------------------------------------------------
 ;; Simulation Control
@@ -44,7 +46,7 @@
 
 (defn start-simulation! []
   (when-not (:running @app-state)
-    (swap! app-state assoc :running true)
+    (swap! app-state assoc :running true :selected nil :dragging false)
     (animation-loop)))
 
 (defn stop-simulation! []
@@ -59,10 +61,12 @@
 
 (defn reset-simulation! []
   (stop-simulation!)
-  (swap! app-state assoc :system
-         (engine/make-system
-           [(engine/make-pendulum {:theta 0.8 :length 1.5})
-            (engine/make-pendulum {:theta 0.5 :length 1.2})])))
+  (swap! app-state assoc
+         :system (engine/make-system
+                   [(engine/make-pendulum {:theta 0.8 :length 1.5})
+                    (engine/make-pendulum {:theta 0.5 :length 1.2})])
+         :selected nil
+         :dragging false))
 
 (defn add-pendulum! []
   (swap! app-state update :system
@@ -73,10 +77,84 @@
   (swap! app-state update :system engine/remove-pendulum))
 
 ;; -----------------------------------------------------------------------------
+;; Mouse Interaction
+;; -----------------------------------------------------------------------------
+
+(defn get-canvas-coords
+  "Converts mouse event to canvas coordinates."
+  [e canvas]
+  (let [rect (.getBoundingClientRect canvas)]
+    [(- (.-clientX e) (.-left rect))
+     (- (.-clientY e) (.-top rect))]))
+
+(defn bob-screen-positions
+  "Returns screen coordinates of all bobs."
+  [system]
+  (mapv (fn [[x y]]
+          [(+ pivot-x (* x scale))
+           (- pivot-y (* y scale))])
+        (engine/bob-positions system)))
+
+(defn hit-test-bob
+  "Returns index of bob at (mx, my) or nil if none hit."
+  [system mx my]
+  (let [positions (bob-screen-positions system)
+        pendulums (:pendulums system)]
+    (first
+      (keep-indexed
+        (fn [idx [bx by]]
+          (let [{:keys [mass]} (nth pendulums idx)
+                radius (+ 8 (* 4 mass))
+                dx (- mx bx)
+                dy (- my by)
+                dist (js/Math.sqrt (+ (* dx dx) (* dy dy)))]
+            (when (<= dist (+ radius 5))  ; 5px extra for easier clicking
+              idx)))
+        positions))))
+
+(defn pivot-for-pendulum
+  "Returns the pivot point (screen coords) for pendulum at idx.
+   For idx 0, it's the main pivot. For idx > 0, it's the previous bob."
+  [system idx]
+  (if (zero? idx)
+    [pivot-x pivot-y]
+    (let [positions (bob-screen-positions system)]
+      (nth positions (dec idx)))))
+
+(defn angle-from-pivot
+  "Calculates the angle from pivot to mouse position.
+   Returns angle in radians where 0 = hanging down, positive = clockwise."
+  [[px py] [mx my]]
+  (let [dx (- mx px)
+        dy (- my py)]  ; positive dy = below pivot (in screen coords)
+    (js/Math.atan2 dx dy)))
+
+(defn handle-mouse-down [e canvas]
+  (when-not (:running @app-state)
+    (let [[mx my] (get-canvas-coords e canvas)
+          system (:system @app-state)
+          hit-idx (hit-test-bob system mx my)]
+      (if hit-idx
+        (swap! app-state assoc :selected hit-idx :dragging true)
+        (swap! app-state assoc :selected nil :dragging false)))))
+
+(defn handle-mouse-move [e canvas]
+  (when (and (:dragging @app-state)
+             (not (:running @app-state)))
+    (let [[mx my] (get-canvas-coords e canvas)
+          {:keys [system selected]} @app-state
+          pivot (pivot-for-pendulum system selected)
+          new-theta (angle-from-pivot pivot [mx my])]
+      (swap! app-state update :system engine/set-pendulum-angle selected new-theta))))
+
+(defn handle-mouse-up [_e _canvas]
+  (swap! app-state assoc :dragging false))
+
+;; -----------------------------------------------------------------------------
 ;; Canvas Rendering
 ;; -----------------------------------------------------------------------------
 
-(defn draw-pendulum-system [ctx system]
+(defn draw-pendulum-system [ctx system selected running]
   (let [positions (engine/bob-positions system)
         pendulums (:pendulums system)]
     ;; Clear canvas
@@ -91,7 +169,8 @@
         (let [[x y] (first bobs)
               screen-x (+ pivot-x (* x scale))
               screen-y (- pivot-y (* y scale))  ; flip y for screen coords
-              color (nth colors (mod idx (count colors)))]
+              color (nth colors (mod idx (count colors)))
+              is-selected (and (not running) (= idx selected))]
 
           ;; Draw arm
           (set! (.-strokeStyle ctx) "#6a6e89")
@@ -109,9 +188,14 @@
             (.arc ctx screen-x screen-y radius 0 (* 2 js/Math.PI))
             (.fill ctx)
 
-            ;; Bob outline
-            (set! (.-strokeStyle ctx) "#ffffff")
-            (set! (.-lineWidth ctx) 2)
+            ;; Bob outline (highlight if selected)
+            (if is-selected
+              (do
+                (set! (.-strokeStyle ctx) "#ffcc00")
+                (set! (.-lineWidth ctx) 4))
+              (do
+                (set! (.-strokeStyle ctx) "#ffffff")
+                (set! (.-lineWidth ctx) 2)))
             (.stroke ctx))
 
           (recur screen-x screen-y (inc idx) (rest bobs)))))
@@ -136,10 +220,11 @@
          (when-let [canvas @canvas-ref]
            (let [ctx (.getContext canvas "2d")]
              (add-watch app-state :render
-                        (fn [_ _ _ new-state]
-                          (draw-pendulum-system ctx (:system new-state))))
+                        (fn [_ _ _ {:keys [system selected running]}]
+                          (draw-pendulum-system ctx system selected running)))
              ;; Initial draw
-             (draw-pendulum-system ctx (:system @app-state)))))
+             (let [{:keys [system selected running]} @app-state]
+               (draw-pendulum-system ctx system selected running)))))
 
        :component-will-unmount
        (fn [_]
@@ -147,9 +232,16 @@
 
        :reagent-render
        (fn []
-         [:canvas {:ref #(reset! canvas-ref %)
-                   :width canvas-width
-                   :height canvas-height}])})))
+         (let [canvas @canvas-ref
+               running (:running @app-state)]
+           [:canvas {:ref #(reset! canvas-ref %)
+                     :width canvas-width
+                     :height canvas-height
+                     :style {:cursor (if running "default" "pointer")}
+                     :on-mouse-down #(when canvas (handle-mouse-down % canvas))
+                     :on-mouse-move #(when canvas (handle-mouse-move % canvas))
+                     :on-mouse-up #(when canvas (handle-mouse-up % canvas))
+                     :on-mouse-leave #(when canvas (handle-mouse-up % canvas))}]))})))
 
 (defn controls-component []
   (let [{:keys [running system]} @app-state

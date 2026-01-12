@@ -299,3 +299,10 @@
   "Returns the number of pendulums in the system."
   [sys]
   (count (:pendulums sys)))
+
+(defn set-pendulum-angle
+  "Sets the angle of pendulum at index idx and resets its velocity to zero."
+  [sys idx theta]
+  (update sys :pendulums
+          (fn [pends]
+            (update pends idx #(assoc % :theta theta :omega 0.0)))))

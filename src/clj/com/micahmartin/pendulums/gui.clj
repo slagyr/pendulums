@@ -21,6 +21,7 @@
              (unchecked-int 0xFFdcfafa)])
 (def arm-color (unchecked-int 0xFF6a6e89))
 (def bob-outline-color (unchecked-int 0xFFffffff))
+(def selected-outline-color (unchecked-int 0xFFffcc00))
 (def pivot-color (unchecked-int 0xFF9a9aba))
 (def bg-color (unchecked-int 0xFF1a1a2e))
 (def btn-color (unchecked-int 0xFF3a3a5e))
@@ -33,7 +34,9 @@
   (atom {:system (engine/make-system
                    [(engine/make-pendulum {:theta 0.8 :length 1.5})
                     (engine/make-pendulum {:theta 0.5 :length 1.2})])
-         :running false}))
+         :running false
+         :selected nil      ; index of selected pendulum (nil = none)
+         :dragging false})) ; true when dragging to adjust angle
 
 (defonce *window (atom nil))
 
@@ -45,14 +48,20 @@
   (swap! *state update :system engine/step dt))
 
 (defn toggle-simulation! []
-  (swap! *state update :running not))
+  (swap! *state (fn [state]
+                  (let [new-running (not (:running state))]
+                    (if new-running
+                      (assoc state :running true :selected nil :dragging false)
+                      (assoc state :running false))))))
 
 (defn reset-simulation! []
   (swap! *state assoc
          :running false
          :system (engine/make-system
                    [(engine/make-pendulum {:theta 0.8 :length 1.5})
-                    (engine/make-pendulum {:theta 0.5 :length 1.2})])))
+                    (engine/make-pendulum {:theta 0.5 :length 1.2})])
+         :selected nil
+         :dragging false))
 
 (defn add-pendulum! []
   (swap! *state update :system
@@ -63,10 +72,73 @@
   (swap! *state update :system engine/remove-pendulum))
 
 ;; -----------------------------------------------------------------------------
+;; Mouse Interaction
+;; -----------------------------------------------------------------------------
+
+(defn bob-screen-positions
+  "Returns screen coordinates of all bobs."
+  [system]
+  (mapv (fn [[x y]]
+          [(+ pivot-x (* x scale))
+           (- pivot-y (* y scale))])
+        (engine/bob-positions system)))
+
+(defn hit-test-bob
+  "Returns index of bob at (mx, my) or nil if none hit."
+  [system mx my]
+  (let [positions (bob-screen-positions system)
+        pendulums (:pendulums system)]
+    (first
+      (keep-indexed
+        (fn [idx [bx by]]
+          (let [{:keys [mass]} (nth pendulums idx)
+                radius (+ 8.0 (* 4.0 mass))
+                dx (- mx bx)
+                dy (- my by)
+                dist (Math/sqrt (+ (* dx dx) (* dy dy)))]
+            (when (<= dist (+ radius 5.0))
+              idx)))
+        positions))))
+
+(defn pivot-for-pendulum
+  "Returns the pivot point (screen coords) for pendulum at idx."
+  [system idx]
+  (if (zero? idx)
+    [pivot-x pivot-y]
+    (let [positions (bob-screen-positions system)]
+      (nth positions (dec idx)))))
+
+(defn angle-from-pivot
+  "Calculates the angle from pivot to mouse position."
+  [[px py] [mx my]]
+  (let [dx (- mx px)
+        dy (- my py)]
+    (Math/atan2 dx dy)))
+
+(defn handle-mouse-down [mx my]
+  (when-not (:running @*state)
+    (let [system (:system @*state)
+          hit-idx (hit-test-bob system mx my)]
+      (if hit-idx
+        (swap! *state assoc :selected hit-idx :dragging true)
+        (swap! *state assoc :selected nil :dragging false)))))
+
+(defn handle-mouse-move [mx my]
+  (when (and (:dragging @*state)
+             (not (:running @*state)))
+    (let [{:keys [system selected]} @*state
+          pivot (pivot-for-pendulum system selected)
+          new-theta (angle-from-pivot pivot [mx my])]
+      (swap! *state update :system engine/set-pendulum-angle selected new-theta))))
+
+(defn handle-mouse-up []
+  (swap! *state assoc :dragging false))
+
+;; -----------------------------------------------------------------------------
 ;; Canvas Rendering
 ;; -----------------------------------------------------------------------------
 
-(defn draw-pendulum-system [^Canvas canvas system]
+(defn draw-pendulum-system [^Canvas canvas system selected running]
   (let [positions (engine/bob-positions system)
         pendulums (:pendulums system)
         arm-paint (doto (Paint.)
@@ -75,9 +147,7 @@
                     (.setStrokeWidth (float 3)))
         bob-paint (Paint.)
         outline-paint (doto (Paint.)
-                        (.setColor bob-outline-color)
-                        (.setMode PaintMode/STROKE)
-                        (.setStrokeWidth (float 2)))
+                        (.setMode PaintMode/STROKE))
         pivot-paint (doto (Paint.) (.setColor pivot-color))]
 
     (loop [prev-x (float pivot-x)
@@ -88,7 +158,8 @@
         (let [[x y] (first bobs)
               screen-x (float (+ pivot-x (* x scale)))
               screen-y (float (- pivot-y (* y scale)))
-              color (nth colors (mod idx (count colors)))]
+              color (nth colors (mod idx (count colors)))
+              is-selected (and (not running) (= idx selected))]
 
           (.drawLine canvas prev-x prev-y screen-x screen-y arm-paint)
 
@@ -96,6 +167,12 @@
                 radius (float (+ 8.0 (* 4.0 mass)))]
             (.setColor bob-paint (int color))
             (.drawCircle canvas screen-x screen-y radius bob-paint)
+            ;; Highlight selected pendulum
+            (if is-selected
+              (do (.setColor outline-paint selected-outline-color)
+                  (.setStrokeWidth outline-paint (float 4)))
+              (do (.setColor outline-paint bob-outline-color)
+                  (.setStrokeWidth outline-paint (float 2))))
             (.drawCircle canvas screen-x screen-y radius outline-paint))
 
           (recur screen-x screen-y (inc idx) (rest bobs)))))
@@ -122,16 +199,32 @@
     [ui/padding {:padding 10}
      [ui/label label]]]])
 
+(defn simulation-canvas []
+  (let [{:keys [running system selected]} @*state]
+    [ui/mouse-listener
+     {:on-button (fn [event]
+                   (let [x (:x event)
+                         y (:y event)]
+                     (if (:pressed? event)
+                       (handle-mouse-down x y)
+                       (handle-mouse-up))))
+      :on-move (fn [event]
+                 (when (:dragging @*state)
+                   (let [x (:x event)
+                         y (:y event)]
+                     (handle-mouse-move x y))))}
+     [ui/canvas
+      {:on-paint (fn [_ctx ^Canvas canvas _size]
+                   (.clear canvas bg-color)
+                   (draw-pendulum-system canvas system selected running))}]]))
+
 (defn app []
   (let [{:keys [running system]} @*state
         n (engine/pendulum-count system)
         energy (engine/total-energy system)]
     [ui/column
-     ;; Canvas area
-     [ui/canvas
-      {:on-paint (fn [_ctx ^Canvas canvas _size]
-                   (.clear canvas bg-color)
-                   (draw-pendulum-system canvas system))}]
+     ;; Canvas area with mouse interaction
+     [simulation-canvas]
      ;; Controls
      [ui/padding {:padding 10}
       [ui/row
