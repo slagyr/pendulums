@@ -1,5 +1,6 @@
 (ns com.micahmartin.pendulums.engine-spec
-  (:require [speclj.core :refer :all]
+  (:require #?(:clj [speclj.core :refer :all]
+               :cljs [speclj.core :refer-macros [describe it should should= should-not= should<]])
             [com.micahmartin.pendulums.engine :as engine]
             [com.micahmartin.pendulums.math :as math]))
 
@@ -39,13 +40,13 @@
       (let [p (engine/make-pendulum {:theta 0.0})
             sys (engine/make-system [p])
             accels (engine/accelerations sys)]
-        (should (< (math/abs (first accels)) tolerance))))
+        (should< (math/abs (first accels)) tolerance)))
 
     (it "has negative acceleration when displaced positively"
       (let [p (engine/make-pendulum {:theta 0.5})
             sys (engine/make-system [p])
             accels (engine/accelerations sys)]
-        (should (< (first accels) 0))))
+        (should< (first accels) 0)))
 
     (it "calculates correct acceleration for small angle"
       (let [theta 0.1
@@ -54,15 +55,15 @@
             p (engine/make-pendulum {:theta theta :length length})
             sys (engine/make-system [p])
             accels (engine/accelerations sys)]
-        (should (< (math/abs (- (first accels) expected)) 0.01)))))
+        (should< (math/abs (- (first accels) expected)) 0.01))))
 
   (describe "step function"
     (it "advances simulation by dt using RK4"
       (let [p (engine/make-pendulum {:theta 0.5 :omega 0.0})
             sys (engine/make-system [p])
             new-sys (engine/step sys 0.01)]
-        (should (< (:omega (first (:pendulums new-sys))) 0))
-        (should (< (:theta (first (:pendulums new-sys))) 0.5))))
+        (should< (:omega (first (:pendulums new-sys))) 0)
+        (should< (:theta (first (:pendulums new-sys))) 0.5)))
 
     (it "conserves energy approximately for single pendulum"
       (let [p (engine/make-pendulum {:theta 0.5 :omega 0.0 :length 1.0})
@@ -70,8 +71,8 @@
             initial-energy (engine/total-energy sys)
             final-sys (reduce (fn [s _] (engine/step s 0.001)) sys (range 100))
             final-energy (engine/total-energy final-sys)]
-        (should (< (math/abs (- initial-energy final-energy))
-                   (* 0.01 (math/abs initial-energy)))))))
+        (should< (math/abs (- initial-energy final-energy))
+                 (* 0.01 (math/abs initial-energy))))))
 
   (describe "double pendulum physics"
     (it "computes accelerations for double pendulum"
@@ -90,16 +91,16 @@
             initial-energy (engine/total-energy sys)
             final-sys (reduce (fn [s _] (engine/step s 0.001)) sys (range 100))
             final-energy (engine/total-energy final-sys)]
-        (should (< (math/abs (- initial-energy final-energy))
-                   (* 0.01 (math/abs initial-energy)))))))
+        (should< (math/abs (- initial-energy final-energy))
+                 (* 0.01 (math/abs initial-energy))))))
 
   (describe "pendulum positions"
     (it "calculates cartesian position of single pendulum bob"
       (let [p (engine/make-pendulum {:theta 0.0 :length 1.0})
             sys (engine/make-system [p])
             positions (engine/bob-positions sys)]
-        (should (< (math/abs (- 0.0 (first (first positions)))) tolerance))
-        (should (< (math/abs (- -1.0 (second (first positions)))) tolerance))))
+        (should< (math/abs (- 0.0 (first (first positions)))) tolerance)
+        (should< (math/abs (- -1.0 (second (first positions)))) tolerance)))
 
     (it "calculates positions for double pendulum"
       (let [p1 (engine/make-pendulum {:theta 0.0 :length 1.0})
@@ -107,7 +108,7 @@
             sys (engine/make-system [p1 p2])
             positions (engine/bob-positions sys)]
         (should= 2 (count positions))
-        (should (< (math/abs (first (first positions))) tolerance))
-        (should (< (math/abs (- -1.0 (second (first positions)))) tolerance))
-        (should (< (math/abs (first (second positions))) tolerance))
-        (should (< (math/abs (- -2.0 (second (second positions)))) tolerance))))))
+        (should< (math/abs (first (first positions))) tolerance)
+        (should< (math/abs (- -1.0 (second (first positions)))) tolerance)
+        (should< (math/abs (first (second positions))) tolerance)
+        (should< (math/abs (- -2.0 (second (second positions)))) tolerance)))))
