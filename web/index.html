@@ -5,13 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pendulums</title>
     <link rel="stylesheet" href="pendulum.css">
+    <!-- Configure Closure for synchronous script loading (works on file:// protocol) -->
+    <script>
+        window.CLOSURE_UNCOMPILED_DEFINES = {};
+        window.CLOSURE_NO_DEPS = true;
+        window.CLOSURE_BASE_PATH = "cljs/out/goog/";
+        window.CLOSURE_IMPORT_SCRIPT = function(src) {
+            document.write('<script src="' + src + '"><\/script>');
+            return true;
+        };
+    </script>
 </head>
 <body>
     <div id="app">
         <p>Loading...</p>
     </div>
     <script src="cljs/out/goog/base.js"></script>
-    <script src="cljs/pendulums.js"></script>
+    <script src="cljs/out/goog/deps.js"></script>
+    <script src="cljs/out/cljs_deps.js"></script>
     <script>goog.require("com.micahmartin.pendulums.core");</script>
     <script>com.micahmartin.pendulums.core.init();</script>
 </body>
