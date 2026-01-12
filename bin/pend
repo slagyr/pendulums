@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-
-# Run the Pendulums desktop application
-
-set -e
-
-cd "$(dirname "$0")/.."
-
-exec clj -M:gui
