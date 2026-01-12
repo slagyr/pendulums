@@ -48,7 +48,6 @@
         (should< (first accels) 0)))
 
     (it "calculates correct acceleration for small angle"
-      ;; For small angles: alpha ≈ -g/L * theta
       (let [theta 0.1
             length 1.0
             expected (- (/ (* g theta) length))
@@ -62,19 +61,15 @@
       (let [p (engine/make-pendulum {:theta 0.5 :omega 0.0})
             sys (engine/make-system [p])
             new-sys (engine/step sys 0.01)]
-        ;; Pendulum should start swinging - omega should become negative
         (should< (:omega (first (:pendulums new-sys))) 0)
-        ;; Theta should decrease slightly (swinging back toward equilibrium)
         (should< (:theta (first (:pendulums new-sys))) 0.5)))
 
     (it "conserves energy approximately for single pendulum"
       (let [p (engine/make-pendulum {:theta 0.5 :omega 0.0 :length 1.0})
             sys (engine/make-system [p])
             initial-energy (engine/total-energy sys)
-            ;; Run 100 steps
             final-sys (reduce (fn [s _] (engine/step s 0.001)) sys (range 100))
             final-energy (engine/total-energy final-sys)]
-        ;; Energy should be conserved within 1%
         (should< (math/abs (- initial-energy final-energy))
                  (* 0.01 (math/abs initial-energy))))))
 
@@ -85,7 +80,6 @@
             sys (engine/make-system [p1 p2])
             accels (engine/accelerations sys)]
         (should= 2 (count accels))
-        ;; Both should have non-zero acceleration
         (should-not= 0.0 (first accels))
         (should-not= 0.0 (second accels))))
 
@@ -94,10 +88,8 @@
             p2 (engine/make-pendulum {:theta 0.3 :omega 0.0})
             sys (engine/make-system [p1 p2])
             initial-energy (engine/total-energy sys)
-            ;; Run 100 steps with small dt
             final-sys (reduce (fn [s _] (engine/step s 0.001)) sys (range 100))
             final-energy (engine/total-energy final-sys)]
-        ;; Energy should be conserved within 1%
         (should< (math/abs (- initial-energy final-energy))
                  (* 0.01 (math/abs initial-energy))))))
 
@@ -106,7 +98,6 @@
       (let [p (engine/make-pendulum {:theta 0.0 :length 1.0})
             sys (engine/make-system [p])
             positions (engine/bob-positions sys)]
-        ;; At theta=0, bob is directly below pivot at (0, -1)
         (should< (math/abs (- 0.0 (first (first positions)))) tolerance)
         (should< (math/abs (- -1.0 (second (first positions)))) tolerance)))
 
@@ -116,9 +107,7 @@
             sys (engine/make-system [p1 p2])
             positions (engine/bob-positions sys)]
         (should= 2 (count positions))
-        ;; First bob at (0, -1)
         (should< (math/abs (first (first positions))) tolerance)
         (should< (math/abs (- -1.0 (second (first positions)))) tolerance)
-        ;; Second bob at (0, -2)
         (should< (math/abs (first (second positions))) tolerance)
         (should< (math/abs (- -2.0 (second (second positions)))) tolerance)))))

@@ -1,5 +1,6 @@
 (ns com.micahmartin.pendulums.math
-  "Cross-platform math functions for pendulum simulation.")
+  "Cross-platform math functions for pendulum simulation."
+  (:refer-clojure :exclude [abs]))
 
 (defn sin [x]
   #?(:clj (Math/sin x)

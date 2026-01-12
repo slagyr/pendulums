@@ -48,10 +48,30 @@ clj -M:test:cljs  # for CLJS specs
 ```
 
 **Testing Guidelines:**
-- Write tests BEFORE or ALONGSIDE implementation
+- Write tests BEFORE implementation
+- Use the TDD cycle: Red, Green, Refactor
 - Aim for high coverage (>90%) on all code
 - Test edge cases and error conditions
 - Unit tests for pure functions and utilities
 - Integration tests for component interactions
 - Keep tests fast and independent
+
+## Clean Code
+
+**CRITICAL**: Write clean code.  DO NOT BE SLOPPY.
+
+**Clean Code Guidelines**
+- Avoid duplicate code.  Refactor duplicate code, or very similar code, into reusable components.
+- Prefer loose couplings.  Use multimethods and/or protocols to decouple code, making more testable and more reusable.
+- Names must reveal intent, The name should tell you everything you need to know.
+- Functions should be small. < 20 lines is good, < 10 lines is better, 4–8 is ideal
+- Do one thing (Single Level of Abstraction). Function should have only one reason to change.
+- Avoid boolean arguments. Boolean params usually mean the function is doing two things. 
+- Never copy-paste logic — extract function/constant/class immediately
+- Boy Scout Rule. Always leave the code a little cleaner than you found it. Every edit should include at least one small cleanup (name, extract, format)
+- Comments should explain intent or why – never what. Good code is self-documenting.
+- Error handling is one thing. Try-catch or error-result handling should not be mixed with business logic
+- Boundaries should be clean. Isolate third-party libraries/frameworks behind clean adapters/interfaces. Never let framework-specific types leak deep into business/domain code.
+- Tests are first-class citizensClean, fast, readable, trustworthy tests are as important as production codeFollow F.I.R.S.T. + one assert per test + descriptive test names
+
 
