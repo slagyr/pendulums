@@ -30,4 +30,4 @@ Built using Reagent.  This is a static SPA (Single Page Application) allowing th
 
 ### Desktop GUI
 
-Built using HumbleUI allowing the app to be run as a desktop application.
+Built using Swing allowing the app to be run as a desktop application.
