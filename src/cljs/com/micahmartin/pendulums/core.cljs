@@ -567,35 +567,71 @@
 (defn set-trail-duration! [duration]
   (swap! app-state assoc :trail-duration duration))
 
+(defn play-pause-button []
+  (let [{:keys [running]} @app-state]
+    [:button.play-pause
+     {:on-click toggle-simulation!
+      :style {:position "absolute"
+              :bottom "20px"
+              :left "50%"
+              :transform "translateX(-50%)"
+              :width "48px"
+              :height "48px"
+              :border-radius "50%"
+              :border "none"
+              :background-color "rgba(245, 158, 11, 0.9)"
+              :color "#000"
+              :font-size "20px"
+              :cursor "pointer"
+              :display "flex"
+              :align-items "center"
+              :justify-content "center"}}
+     (if running "⏸" "▶")]))
+
 (defn controls-component []
-  (let [{:keys [running system trail-duration]} @app-state
+  (let [{:keys [system trail-duration]} @app-state
         n (engine/pendulum-count system)
         energy (engine/total-energy system)]
     [:div.controls
-     [:button.primary {:on-click toggle-simulation!}
-      (if running "Pause" "Play")]
-     [:button {:on-click add-pendulum!} "+ Pendulum"]
-     [:button {:on-click remove-pendulum!
-               :disabled (< n 2)}
-      "- Pendulum"]
-     [:button {:on-click center-view!} "Center"]
-     [:span.status (str "Trail: " (.toFixed trail-duration 1) "s")]
-     [:input {:type "range"
-              :min 0
-              :max 100
-              :value (* trail-duration 10)
-              :style {:width "100px" :vertical-align "middle"}
-              :on-change #(set-trail-duration! (/ (js/parseInt (-> % .-target .-value)) 10.0))}]
-     [:span.status (str "Pendulums: " n)]
-     [:span.status (str "Energy: " (.toFixed energy 2) " J")]]))
+     {:style {:position "absolute"
+              :bottom "10px"
+              :left "10px"
+              :display "flex"
+              :flex-direction "column"
+              :gap "8px"
+              :background-color "rgba(26, 26, 26, 0.8)"
+              :padding "10px"
+              :border-radius "4px"}}
+     [:div {:style {:display "flex" :gap "8px" :align-items "center"}}
+      [:button {:on-click add-pendulum!
+                :style {:padding "4px 8px" :cursor "pointer"}} "+"]
+      [:button {:on-click remove-pendulum!
+                :disabled (< n 2)
+                :style {:padding "4px 8px" :cursor "pointer"}} "-"]
+      [:span {:style {:color "#c8c8c8" :font-size "12px"}} (str n " pendulums")]]
+     [:div {:style {:display "flex" :gap "8px" :align-items "center"}}
+      [:button {:on-click center-view!
+                :style {:padding "4px 8px" :cursor "pointer"}} "Center"]]
+     [:div {:style {:display "flex" :gap "8px" :align-items "center"}}
+      [:span {:style {:color "#c8c8c8" :font-size "12px"}} "Trail:"]
+      [:input {:type "range"
+               :min 0
+               :max 100
+               :value (* trail-duration 10)
+               :style {:width "80px"}
+               :on-change #(set-trail-duration! (/ (js/parseInt (-> % .-target .-value)) 10.0))}]
+      [:span {:style {:color "#c8c8c8" :font-size "12px"}} (str (.toFixed trail-duration 1) "s")]]
+     [:div {:style {:color "#c8c8c8" :font-size "12px"}}
+      (str "Energy: " (.toFixed energy 2) " J")]]))
 
 (defn app-component []
   [:div#app
    [:div.simulation-container
     {:style {:position "relative"}}
     [canvas-component]
-    [angle-input-component]]
-   [controls-component]])
+    [angle-input-component]
+    [play-pause-button]
+    [controls-component]]])
 
 ;; -----------------------------------------------------------------------------
 ;; Entry Point
