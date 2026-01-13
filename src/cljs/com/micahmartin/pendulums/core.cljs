@@ -321,11 +321,15 @@
   "Draws a tabular display of pendulum angles in the top left of the canvas."
   [ctx system editing-angle]
   (let [pendulums (:pendulums system)
-        header-y (+ angle-display-padding angle-display-line-height)]
+        header-y (+ angle-display-padding angle-display-line-height)
+        swatch-width 12
+        num-x (+ angle-display-padding swatch-width 4)  ; 4px gap after swatch
+        angle-x (+ num-x 24)]                           ; space for "N " then angle
     (set! (.-font ctx) "14px monospace")
     ;; Header
     (set! (.-fillStyle ctx) "#c8c8c8")
-    (.fillText ctx "Pendulum    Angle" angle-display-padding header-y)
+    (.fillText ctx "#" num-x header-y)
+    (.fillText ctx "Angle" angle-x header-y)
     ;; Draw each pendulum's angle
     (doseq [[idx {:keys [theta]}] (map-indexed vector pendulums)]
       (let [y (+ header-y (* (inc idx) angle-display-line-height))
@@ -335,17 +339,16 @@
             is-editing (= idx editing-angle)]
         ;; Draw color indicator box
         (set! (.-fillStyle ctx) color)
-        (.fillRect ctx angle-display-padding (- y 10) 12 12)
+        (.fillRect ctx angle-display-padding (- y 10) swatch-width swatch-width)
         (set! (.-strokeStyle ctx) "#ffffff")
         (set! (.-lineWidth ctx) 1)
-        (.strokeRect ctx angle-display-padding (- y 10) 12 12)
-        ;; Draw label (and angle if not editing)
+        (.strokeRect ctx angle-display-padding (- y 10) swatch-width swatch-width)
+        ;; Draw number right after swatch
         (set! (.-fillStyle ctx) "#c8c8c8")
-        (if is-editing
-          ;; When editing, only draw the label portion (no angle)
-          (.fillText ctx (str " " (inc idx)) (+ angle-display-padding 12) y)
-          ;; Normal: draw label and angle
-          (.fillText ctx (str " " (inc idx) "      " angle-str) (+ angle-display-padding 12) y))))))
+        (.fillText ctx (str (inc idx)) num-x y)
+        ;; Draw angle (if not editing)
+        (when-not is-editing
+          (.fillText ctx angle-str angle-x y))))))
 
 (defn display-angle->theta
   "Converts display angle (0°=up, 90°=right, 180°=down, 270°=left) back to physics theta."
@@ -535,10 +538,8 @@
       (let [header-y (+ angle-display-padding angle-display-line-height)
             row-y (+ header-y (* (inc editing-angle) angle-display-line-height))
             input-top (- row-y 14)
-            ;; Position input where the angle text appears (after " N      " = ~8 chars from text start)
-            ;; Text starts at x = angle-display-padding + 12 = 22
-            ;; At 14px monospace (~8.4px/char), 8 chars = ~67px, so angle starts at ~89px
-            input-left 90]
+            ;; Match angle-x from draw-angle-display: padding(10) + swatch(12) + gap(4) + num-space(24) = 50
+            input-left 50]
         [:div.angle-input-overlay
          {:style {:position "absolute"
                   :top (str input-top "px")
