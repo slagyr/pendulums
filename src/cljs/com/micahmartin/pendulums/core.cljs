@@ -579,13 +579,14 @@
               :height "48px"
               :border-radius "50%"
               :border "none"
-              :background-color "rgba(245, 158, 11, 0.9)"
+              :background-color (if running "rgba(245, 158, 11, 0.9)" "rgba(34, 197, 94, 0.9)")
               :color "#000"
-              :font-size "20px"
+              :font-size "18px"
               :cursor "pointer"
               :display "flex"
               :align-items "center"
-              :justify-content "center"}}
+              :justify-content "center"
+              :padding-left (if running "0" "3px")}}  ; nudge play icon to center
      (if running "⏸" "▶")]))
 
 (defn controls-component []
