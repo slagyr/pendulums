@@ -272,3 +272,51 @@
         pan-x (- (/ canvas-width 2.0) (* pivot-x fit-zoom))
         pan-y (- (/ canvas-height 2.0) (* system-center-y fit-zoom))]
     (assoc state :zoom fit-zoom :pan [pan-x pan-y])))
+
+(defn hit-test-angle-display
+  "Returns the index of the pendulum whose angle row was clicked, or nil."
+  [system mx my]
+  (let [pendulums (:pendulums system)
+        header-y (+ angle-display-padding angle-display-line-height)]
+    (when (< mx angle-display-row-width)
+      (some (fn [idx]
+              (let [row-y (+ header-y (* (inc idx) angle-display-line-height))
+                    top (- row-y 12)
+                    bottom (+ row-y 4)]
+                (when (and (>= my top) (<= my bottom))
+                  idx)))
+            (range (count pendulums))))))
+
+(defn- format-angle
+  "Formats angle to 2 decimal places, platform-independent."
+  [angle]
+  #?(:clj (format "%.2f" (double angle))
+     :cljs (.toFixed angle 2)))
+
+(defn start-angle-edit
+  "Starts editing the angle for the pendulum at idx. Returns updated state."
+  [state idx]
+  (let [pendulum (get-in state [:system :pendulums idx])
+        display-angle (normalize-angle (:theta pendulum))]
+    (assoc state
+           :editing-angle idx
+           :angle-input (format-angle display-angle))))
+
+(defn handle-mouse-down
+  "Handles mouse down at coordinates (mx, my). Returns updated state."
+  [state mx my]
+  (let [{:keys [running system zoom pan canvas-width]} state
+        angle-hit (hit-test-angle-display system mx my)
+        bob-hit (hit-test-bob system mx my zoom pan canvas-width)]
+    (cond
+      ;; Check for angle display click first (when not running)
+      (and (not running) angle-hit)
+      (start-angle-edit state angle-hit)
+
+      ;; Bob selection for dragging (when not running)
+      (and (not running) bob-hit)
+      (assoc state :selected bob-hit :dragging true)
+
+      ;; Clicked on empty space - start panning
+      :else
+      (assoc state :selected nil :dragging false :panning true :pan-start [mx my]))))

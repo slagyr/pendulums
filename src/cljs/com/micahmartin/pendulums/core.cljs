@@ -70,9 +70,6 @@
 ;; Mouse Interaction
 ;; -----------------------------------------------------------------------------
 
-;; Forward declarations for functions defined in Angle Display section
-(declare hit-test-angle-display start-angle-edit!)
-
 (defn get-canvas-coords
   "Converts mouse event to canvas coordinates."
   [e canvas]
@@ -80,25 +77,9 @@
     [(- (.-clientX e) (.-left rect))
      (- (.-clientY e) (.-top rect))]))
 
-
-;; TODO - MDM: If we pass in coordinates instead of e and canvas, the fn can be moved to ui
 (defn handle-mouse-down [e canvas]
-  (let [[mx my] (get-canvas-coords e canvas)
-        {:keys [running system zoom pan canvas-width]} @app-state
-        angle-hit (hit-test-angle-display system mx my)
-        hit-idx (ui/hit-test-bob system mx my zoom pan canvas-width)]
-    (cond
-      ;; Check for angle display click first (when not running)
-      (and (not running) angle-hit)
-      (start-angle-edit! angle-hit)
-
-      ;; Bob selection for dragging (when not running)
-      (and (not running) hit-idx)
-      (swap! app-state assoc :selected hit-idx :dragging true)
-
-      ;; Clicked on empty space - start panning
-      :else
-      (swap! app-state assoc :selected nil :dragging false :panning true :pan-start [mx my]))))
+  (let [[mx my] (get-canvas-coords e canvas)]
+    (swap! app-state ui/handle-mouse-down mx my)))
 
 ;; TODO - MDM: If we pass in coordinates instead of e and canvas, the fn can be moved to ui
 (defn handle-mouse-move [e canvas]
@@ -146,19 +127,6 @@
 ;; Angle Display
 ;; -----------------------------------------------------------------------------
 
-(defn hit-test-angle-display
-  "Returns the index of the pendulum whose angle row was clicked, or nil."
-  [system mx my]
-  (let [pendulums (:pendulums system)
-        header-y (+ ui/angle-display-padding ui/angle-display-line-height)]
-    (when (< mx ui/angle-display-row-width)
-      (some (fn [idx]
-              (let [row-y (+ header-y (* (inc idx) ui/angle-display-line-height))
-                    top (- row-y 12)
-                    bottom (+ row-y 4)]
-                (when (and (>= my top) (<= my bottom))
-                  idx)))
-            (range (count pendulums))))))
 
 
 (defn draw-angle-display
@@ -195,16 +163,8 @@
           (.fillText ctx angle-str angle-x y))))))
 
 
-;; TODO - MDM: move to ui
-(defn start-angle-edit!
-  "Opens the inline angle editor for the pendulum at idx."
-  [idx]
-  (let [{:keys [system]} @app-state
-        pendulum (get-in system [:pendulums idx])
-        display-angle (ui/normalize-angle (:theta pendulum))]
-    (swap! app-state assoc
-           :editing-angle idx
-           :angle-input (.toFixed display-angle 2))))
+(defn start-angle-edit! [idx]
+  (swap! app-state ui/start-angle-edit idx))
 
 ;; TODO - MDM: move to ui
 (defn cancel-angle-edit! []

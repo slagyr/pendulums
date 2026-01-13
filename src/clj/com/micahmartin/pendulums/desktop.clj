@@ -81,29 +81,8 @@
 ;; Mouse Interaction
 ;; -----------------------------------------------------------------------------
 
-(defn hit-test-angle-display
-  "Returns the index of the pendulum whose angle row was clicked, or nil."
-  [system mx my]
-  (let [pendulums (:pendulums system)
-        header-y (+ ui/angle-display-padding ui/angle-display-line-height)]
-    (when (< mx ui/angle-display-row-width)
-      (some (fn [idx]
-              (let [row-y (+ header-y (* (inc idx) ui/angle-display-line-height))
-                    top (- row-y 12)
-                    bottom (+ row-y 4)]
-                (when (and (>= my top) (<= my bottom))
-                  idx)))
-            (range (count pendulums))))))
-
-(defn start-angle-edit!
-  "Starts inline editing of the angle for the pendulum at the given index."
-  [idx]
-  (let [{:keys [system]} @*state
-        pendulum (get-in system [:pendulums idx])
-        display-angle (ui/normalize-angle (:theta pendulum))]
-    (swap! *state assoc
-           :editing-angle idx
-           :angle-input (format "%.2f" display-angle))))
+(defn start-angle-edit! [idx]
+  (swap! *state ui/start-angle-edit idx))
 
 (defn cancel-angle-edit! []
   (swap! *state assoc :editing-angle nil :angle-input ""))
@@ -119,26 +98,14 @@
     (cancel-angle-edit!)))
 
 (defn handle-mouse-down [mx my button]
-  (let [{:keys [running system zoom pan canvas-width]} @*state]
-    (cond
-      ;; Right-click or middle-click starts panning
-      (or (= button 2) (= button 3))
-      (swap! *state assoc :panning true :pan-start [mx my])
+  (cond
+    ;; Right-click or middle-click starts panning
+    (or (= button 2) (= button 3))
+    (swap! *state assoc :panning true :pan-start [mx my])
 
-      ;; Left-click
-      (= button 1)
-      (cond
-        ;; When not running, check for angle display interaction first
-        (and (not running) (hit-test-angle-display system mx my))
-        (start-angle-edit! (hit-test-angle-display system mx my))
-
-        ;; When not running, check for bob selection for dragging
-        (and (not running) (ui/hit-test-bob system mx my zoom pan canvas-width))
-        (swap! *state assoc :selected (ui/hit-test-bob system mx my zoom pan canvas-width) :dragging true)
-
-        ;; Otherwise (empty space), start panning
-        :else
-        (swap! *state assoc :panning true :pan-start [mx my] :selected nil)))))
+    ;; Left-click uses shared handler
+    (= button 1)
+    (swap! *state ui/handle-mouse-down mx my)))
 
 (defn handle-mouse-move [mx my]
   (let [{:keys [dragging panning running system selected zoom pan pan-start canvas-width]} @*state]
