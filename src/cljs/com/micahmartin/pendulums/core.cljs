@@ -586,7 +586,7 @@
               :display "flex"
               :align-items "center"
               :justify-content "center"
-              :padding-left (if running "0" "3px")}}  ; nudge play icon to center
+              :padding-left (if running "0" "4px")}}  ; nudge play icon to center
      (if running "⏸" "▶")]))
 
 (defn controls-component []
