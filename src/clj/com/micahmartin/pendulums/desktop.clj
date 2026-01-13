@@ -1,6 +1,7 @@
 (ns com.micahmartin.pendulums.desktop
   "Desktop GUI using Swing for coupled pendulum simulation."
-  (:require [com.micahmartin.pendulums.engine :as engine])
+  (:require [com.micahmartin.pendulums.engine :as engine]
+            [com.micahmartin.pendulums.ui :as ui])
   (:import [java.awt Color Graphics2D RenderingHints BasicStroke Dimension BorderLayout Font]
            [java.awt.event MouseAdapter MouseMotionAdapter MouseWheelListener ActionListener]
            [java.awt.geom Ellipse2D$Double Line2D$Double]
@@ -8,28 +9,26 @@
            [javax.swing.event ChangeListener]))
 
 ;; -----------------------------------------------------------------------------
-;; Constants
+;; Constants (derived from shared ui.cljc)
 ;; -----------------------------------------------------------------------------
 
-(def canvas-width 800)
-(def canvas-height 600)
-(def scale 100.0)
+(def canvas-width ui/default-canvas-width)
+(def canvas-height ui/default-canvas-height)
 (def pivot-x (/ canvas-width 2.0))
-(def pivot-y 150.0)
-(def dt 0.016)
+(def pivot-y ui/pivot-y-offset)
 
-;; Warm Physics color palette
-(def colors [(Color. 0xef 0x44 0x44)
-             (Color. 0xf9 0x73 0x16)
-             (Color. 0xea 0xb3 0x08)
-             (Color. 0x84 0xcc 0x16)
-             (Color. 0x22 0xc5 0x5e)])
-(def arm-color (Color. 0x52 0x52 0x52))
-(def bob-outline-color Color/WHITE)
-(def pivot-color (Color. 0x73 0x73 0x73))
-(def bg-color (Color. 0x12 0x12 0x12))
-(def btn-bg-color (Color. 0x40 0x40 0x40))
-(def btn-fg-color Color/WHITE)
+;; Convert hex colors to AWT Color objects
+(defn- hex->color [hex]
+  (let [[r g b] (ui/hex->rgb hex)]
+    (Color. (int r) (int g) (int b))))
+
+(def colors (mapv hex->color ui/pendulum-colors))
+(def arm-color (hex->color ui/arm-color))
+(def bob-outline-color (hex->color ui/bob-outline-color))
+(def pivot-color (hex->color ui/pivot-color))
+(def bg-color (hex->color ui/bg-color))
+(def btn-bg-color (hex->color ui/btn-bg-color))
+(def btn-fg-color (hex->color ui/btn-fg-color))
 
 ;; -----------------------------------------------------------------------------
 ;; Coordinate Transformations
@@ -38,16 +37,16 @@
 (defn world->screen
   "Converts world (physics) coordinates to screen coordinates."
   [[wx wy] zoom [pan-x pan-y]]
-  [(+ (* (+ pivot-x (* wx scale)) zoom) pan-x)
-   (+ (* (- pivot-y (* wy scale)) zoom) pan-y)])
+  [(+ (* (+ pivot-x (* wx ui/scale)) zoom) pan-x)
+   (+ (* (- pivot-y (* wy ui/scale)) zoom) pan-y)])
 
 (defn screen->world
   "Converts screen coordinates to world (physics) coordinates."
   [[sx sy] zoom [pan-x pan-y]]
   (let [unzoomed-x (/ (- sx pan-x) zoom)
         unzoomed-y (/ (- sy pan-y) zoom)]
-    [(/ (- unzoomed-x pivot-x) scale)
-     (/ (- pivot-y unzoomed-y) scale)]))
+    [(/ (- unzoomed-x pivot-x) ui/scale)
+     (/ (- pivot-y unzoomed-y) ui/scale)]))
 
 (defn pivot-screen-pos
   "Returns the screen position of the main pivot point."
@@ -60,18 +59,9 @@
 ;; -----------------------------------------------------------------------------
 
 (defonce *state
-  (atom {:system (engine/make-system
-                   [(engine/make-pendulum {:theta 0.8 :length 1.0})
-                    (engine/make-pendulum {:theta 0.5 :length 1.0})])
-         :running false
-         :selected nil
-         :dragging false
-         :zoom 1.0
-         :pan [0.0 0.0]
-         :panning false
-         :pan-start nil
-         :trails []              ; Vector of trails, one per pendulum. Each trail is a list of {:pos [x y] :time ms}
-         :trail-duration 3.0}))
+  (atom (assoc ui/default-state
+               :system (engine/make-system
+                         (mapv engine/make-pendulum ui/initial-pendulums)))))
 
 ;; -----------------------------------------------------------------------------
 ;; Simulation Control
@@ -81,7 +71,7 @@
   (let [now (System/currentTimeMillis)]
     (swap! *state
            (fn [{:keys [system trail-duration] :as state}]
-             (let [new-system (engine/step system dt)
+             (let [new-system (engine/step system ui/dt)
                    positions (engine/bob-positions new-system)
                    cutoff (- now (* trail-duration 1000))
                    ;; Add new positions to trails and prune old entries
@@ -101,23 +91,15 @@
                       (assoc state :running false))))))
 
 (defn reset-simulation! []
-  (swap! *state assoc
-         :running false
-         :system (engine/make-system
-                   [(engine/make-pendulum {:theta 0.8 :length 1.0})
-                    (engine/make-pendulum {:theta 0.5 :length 1.0})])
-         :selected nil
-         :dragging false
-         :zoom 1.0
-         :pan [0.0 0.0]
-         :panning false
-         :pan-start nil
-         :trails []))
+  (swap! *state (fn [_]
+                  (assoc ui/default-state
+                         :system (engine/make-system
+                                   (mapv engine/make-pendulum ui/initial-pendulums))))))
 
 (defn add-pendulum! []
   (swap! *state (fn [state]
                   (-> state
-                      (update :system engine/add-pendulum (engine/make-pendulum {:theta 0.3 :length 1.0}))
+                      (update :system engine/add-pendulum (engine/make-pendulum ui/new-pendulum-config))
                       (assoc :trails [])))))
 
 (defn remove-pendulum! []
@@ -136,7 +118,7 @@
                      (reduce + 0.0 (map :length pendulums))
                      1.5)
         ;; Convert to pixels at zoom 1.0
-        extent-pixels (* max-extent scale)
+        extent-pixels (* max-extent ui/scale)
         ;; The pendulum can swing in all directions, so fit a circle of radius extent-pixels
         ;; with padding for comfortable viewing
         padding 120.0
@@ -173,7 +155,7 @@
       (keep-indexed
         (fn [idx [bx by]]
           (let [{:keys [mass]} (nth pendulums idx)
-                base-radius (+ 8.0 (* 4.0 mass))
+                base-radius (ui/bob-radius mass)
                 radius (* base-radius zoom)
                 dx (- mx bx)
                 dy (- my by)
@@ -316,7 +298,7 @@
                 alpha (max 0.0 (- 1.0 (/ (double age) duration-ms)))
                 [x y] pos
                 [sx sy] (world->screen pos zoom pan)
-                radius (* 2.0 zoom)]
+                radius (* ui/trail-dot-radius zoom)]
             (when (> alpha 0.0)
               (.setColor g (Color. (.getRed color) (.getGreen color) (.getBlue color) (int (* 255 alpha))))
               (.fill g (Ellipse2D$Double. (- sx radius) (- sy radius)
@@ -340,12 +322,12 @@
               [screen-x screen-y] (world->screen [x y] zoom pan)
               color (nth colors (mod idx (count colors)))
               {:keys [mass]} (nth pendulums idx)
-              base-radius (+ 8.0 (* 4.0 mass))
+              base-radius (ui/bob-radius mass)
               radius (* base-radius zoom)]
 
           ;; Draw arm
           (.setColor g arm-color)
-          (.setStroke g (BasicStroke. (float (* 3.0 zoom))))
+          (.setStroke g (BasicStroke. (float (* ui/arm-stroke-width zoom))))
           (.draw g (Line2D$Double. prev-x prev-y screen-x screen-y))
 
           ;; Draw bob
@@ -355,14 +337,14 @@
 
           ;; Draw outline
           (.setColor g bob-outline-color)
-          (.setStroke g (BasicStroke. (float (* 2.0 zoom))))
+          (.setStroke g (BasicStroke. (float (* ui/bob-outline-width zoom))))
           (.draw g (Ellipse2D$Double. (- screen-x radius) (- screen-y radius)
                                       (* 2 radius) (* 2 radius)))
 
           (recur screen-x screen-y (inc idx) (rest bobs)))))
 
     ;; Draw pivot
-    (let [pivot-radius (* 6.0 zoom)]
+    (let [pivot-radius (* ui/pivot-radius zoom)]
       (.setColor g pivot-color)
       (.fill g (Ellipse2D$Double. (- piv-sx pivot-radius) (- piv-sy pivot-radius)
                                   (* 2 pivot-radius) (* 2 pivot-radius))))))
