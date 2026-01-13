@@ -24,6 +24,7 @@
 (def bg-color (hex->color ui/bg-color))
 (def btn-bg-color (hex->color ui/btn-bg-color))
 (def btn-fg-color (hex->color ui/btn-fg-color))
+(def text-color (hex->color ui/text-color))
 
 
 ;; -----------------------------------------------------------------------------
@@ -115,13 +116,10 @@
   "Returns the index of the pendulum whose angle row was clicked, or nil."
   [system mx my]
   (let [pendulums (:pendulums system)
-        padding 10
-        line-height 20
-        header-y (+ padding line-height)
-        row-width 180]
-    (when (< mx row-width)
+        header-y (+ ui/angle-display-padding ui/angle-display-line-height)]
+    (when (< mx ui/angle-display-row-width)
       (some (fn [idx]
-              (let [row-y (+ header-y (* (inc idx) line-height))
+              (let [row-y (+ header-y (* (inc idx) ui/angle-display-line-height))
                     top (- row-y 12)
                     bottom (+ row-y 4)]
                 (when (and (>= my top) (<= my bottom))
@@ -287,30 +285,28 @@
   [^Graphics2D g system editing-angle]
   (let [pendulums (:pendulums system)
         font (Font. "Monospaced" Font/PLAIN 14)
-        padding 10
-        line-height 20
-        header-y (+ padding line-height)]
+        header-y (+ ui/angle-display-padding ui/angle-display-line-height)]
     (.setFont g font)
     ;; Header
-    (.setColor g (Color. 200 200 200))
-    (.drawString g "Pendulum    Angle" padding header-y)
+    (.setColor g text-color)
+    (.drawString g "Pendulum    Angle" ui/angle-display-padding header-y)
     ;; Draw each pendulum's angle
     (doseq [[idx {:keys [theta]}] (map-indexed vector pendulums)]
-      (let [y (+ header-y (* (inc idx) line-height))
+      (let [y (+ header-y (* (inc idx) ui/angle-display-line-height))
             color (nth colors (mod idx (count colors)))
             display-angle (ui/normalize-angle theta)
             angle-str (format "%7.2f°" display-angle)
             is-editing (= idx editing-angle)]
         ;; Draw color indicator
         (.setColor g color)
-        (.fillRect g padding (- y 10) 12 12)
-        (.setColor g Color/WHITE)
-        (.drawRect g padding (- y 10) 12 12)
+        (.fillRect g ui/angle-display-padding (- y 10) 12 12)
+        (.setColor g bob-outline-color)
+        (.drawRect g ui/angle-display-padding (- y 10) 12 12)
         ;; Draw label and angle (skip angle value if editing)
-        (.setColor g (Color. 200 200 200))
+        (.setColor g text-color)
         (if is-editing
-          (.drawString g (format "    %d      " (inc idx)) (+ padding 12) y)
-          (.drawString g (format "    %d      %s" (inc idx) angle-str) (+ padding 12) y))))))
+          (.drawString g (format "    %d      " (inc idx)) (+ ui/angle-display-padding 12) y)
+          (.drawString g (format "    %d      %s" (inc idx) angle-str) (+ ui/angle-display-padding 12) y))))))
 
 ;; -----------------------------------------------------------------------------
 ;; UI Components
@@ -389,8 +385,8 @@
         angle-input-field (doto (JTextField. 8)
                             (.setFont (Font. "Monospaced" Font/PLAIN 12))
                             (.setBackground (Color. 0x30 0x30 0x30))
-                            (.setForeground (Color. 0xc8 0xc8 0xc8))
-                            (.setBorder (javax.swing.BorderFactory/createLineBorder (Color. 0x40 0x40 0x40)))
+                            (.setForeground text-color)
+                            (.setBorder (javax.swing.BorderFactory/createLineBorder btn-bg-color))
                             (.setVisible false))
 
         ;; Play/Pause button (bottom center)
@@ -401,12 +397,12 @@
 
         ;; Pendulum count label
         count-label (doto (JLabel. "2 pendulums")
-                      (.setForeground (Color. 0xc8 0xc8 0xc8))
+                      (.setForeground text-color)
                       (.setFont (Font. "Dialog" Font/PLAIN 12)))
 
         ;; Trail duration label
         trail-label (doto (JLabel. "3.0s")
-                      (.setForeground (Color. 0xc8 0xc8 0xc8))
+                      (.setForeground text-color)
                       (.setFont (Font. "Dialog" Font/PLAIN 12)))
 
         ;; Trail slider
@@ -506,7 +502,7 @@
     (.add panel count-label)
     (.add panel plus-btn)
     (.add panel (doto (JLabel. "Trail:")
-                  (.setForeground (Color. 0xc8 0xc8 0xc8))
+                  (.setForeground text-color)
                   (.setFont (Font. "Dialog" Font/PLAIN 12))
                   (.setBounds 0 0 40 20)))  ; Will be repositioned
     (.add panel trail-slider)
@@ -545,10 +541,8 @@
             (when (not= old-editing new-editing)
               (if new-editing
                 ;; Show the input field positioned at the correct row
-                (let [padding 10
-                      line-height 20
-                      header-y (+ padding line-height)
-                      row-y (+ header-y (* (inc new-editing) line-height))
+                (let [header-y (+ ui/angle-display-padding ui/angle-display-line-height)
+                      row-y (+ header-y (* (inc new-editing) ui/angle-display-line-height))
                       input-x 75  ; After "X     " text
                       input-y (- row-y 14)]
                   (.setText angle-input-field (:angle-input new-state))

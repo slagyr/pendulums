@@ -180,18 +180,14 @@
 ;; Angle Display
 ;; -----------------------------------------------------------------------------
 
-(def angle-display-padding 10)
-(def angle-display-line-height 20)
-(def angle-display-row-width 180)
-
 (defn hit-test-angle-display
   "Returns the index of the pendulum whose angle row was clicked, or nil."
   [system mx my]
   (let [pendulums (:pendulums system)
-        header-y (+ angle-display-padding angle-display-line-height)]
-    (when (< mx angle-display-row-width)
+        header-y (+ ui/angle-display-padding ui/angle-display-line-height)]
+    (when (< mx ui/angle-display-row-width)
       (some (fn [idx]
-              (let [row-y (+ header-y (* (inc idx) angle-display-line-height))
+              (let [row-y (+ header-y (* (inc idx) ui/angle-display-line-height))
                     top (- row-y 12)
                     bottom (+ row-y 4)]
                 (when (and (>= my top) (<= my bottom))
@@ -203,9 +199,9 @@
   "Draws a tabular display of pendulum angles in the top left of the canvas."
   [ctx system editing-angle]
   (let [pendulums (:pendulums system)
-        header-y (+ angle-display-padding angle-display-line-height)
+        header-y (+ ui/angle-display-padding ui/angle-display-line-height)
         swatch-width 12
-        num-x (+ angle-display-padding swatch-width 4)  ; 4px gap after swatch
+        num-x (+ ui/angle-display-padding swatch-width 4)  ; 4px gap after swatch
         angle-x (+ num-x 24)]                           ; space for "N " then angle
     (set! (.-font ctx) "14px monospace")
     ;; Header
@@ -214,17 +210,17 @@
     (.fillText ctx "Angle" angle-x header-y)
     ;; Draw each pendulum's angle
     (doseq [[idx {:keys [theta]}] (map-indexed vector pendulums)]
-      (let [y (+ header-y (* (inc idx) angle-display-line-height))
+      (let [y (+ header-y (* (inc idx) ui/angle-display-line-height))
             color (nth colors (mod idx (count colors)))
             display-angle (ui/normalize-angle theta)
             angle-str (str (.toFixed display-angle 2) "°")
             is-editing (= idx editing-angle)]
         ;; Draw color indicator box
         (set! (.-fillStyle ctx) color)
-        (.fillRect ctx angle-display-padding (- y 10) swatch-width swatch-width)
+        (.fillRect ctx ui/angle-display-padding (- y 10) swatch-width swatch-width)
         (set! (.-strokeStyle ctx) "#ffffff")
         (set! (.-lineWidth ctx) 1)
-        (.strokeRect ctx angle-display-padding (- y 10) swatch-width swatch-width)
+        (.strokeRect ctx ui/angle-display-padding (- y 10) swatch-width swatch-width)
         ;; Draw number right after swatch
         (set! (.-fillStyle ctx) "#c8c8c8")
         (.fillText ctx (str (inc idx)) num-x y)
@@ -415,8 +411,8 @@
 (defn angle-input-component []
   (let [{:keys [editing-angle angle-input]} @app-state]
     (when editing-angle
-      (let [header-y (+ angle-display-padding angle-display-line-height)
-            row-y (+ header-y (* (inc editing-angle) angle-display-line-height))
+      (let [header-y (+ ui/angle-display-padding ui/angle-display-line-height)
+            row-y (+ header-y (* (inc editing-angle) ui/angle-display-line-height))
             input-top (- row-y 14)
             ;; Match angle-x from draw-angle-display: padding(10) + swatch(12) + gap(4) + num-space(24) = 50
             input-left 50]
