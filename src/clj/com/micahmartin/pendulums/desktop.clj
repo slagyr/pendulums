@@ -3,19 +3,14 @@
   (:require [com.micahmartin.pendulums.engine :as engine]
             [com.micahmartin.pendulums.ui :as ui])
   (:import [java.awt Color Graphics2D RenderingHints BasicStroke Dimension BorderLayout Font]
-           [java.awt.event MouseAdapter MouseMotionAdapter MouseWheelListener ActionListener]
+           [java.awt.event MouseAdapter MouseMotionAdapter MouseWheelListener ActionListener ComponentAdapter KeyAdapter KeyEvent]
            [java.awt.geom Ellipse2D$Double Line2D$Double]
-           [javax.swing JFrame JPanel JButton JSlider JLabel JOptionPane Timer SwingUtilities UIManager]
-           [javax.swing.event ChangeListener]))
+           [javax.swing JFrame JPanel JButton JSlider JLabel JTextField Timer SwingUtilities UIManager]
+           [javax.swing.event ChangeListener DocumentListener]))
 
 ;; -----------------------------------------------------------------------------
 ;; Constants (derived from shared ui.cljc)
 ;; -----------------------------------------------------------------------------
-
-(def canvas-width ui/default-canvas-width)
-(def canvas-height ui/default-canvas-height)
-(def pivot-x (/ canvas-width 2.0))
-(def pivot-y ui/pivot-y-offset)
 
 ;; Convert hex colors to AWT Color objects
 (defn- hex->color [hex]
@@ -30,29 +25,6 @@
 (def btn-bg-color (hex->color ui/btn-bg-color))
 (def btn-fg-color (hex->color ui/btn-fg-color))
 
-;; -----------------------------------------------------------------------------
-;; Coordinate Transformations
-;; -----------------------------------------------------------------------------
-
-(defn world->screen
-  "Converts world (physics) coordinates to screen coordinates."
-  [[wx wy] zoom [pan-x pan-y]]
-  [(+ (* (+ pivot-x (* wx ui/scale)) zoom) pan-x)
-   (+ (* (- pivot-y (* wy ui/scale)) zoom) pan-y)])
-
-(defn screen->world
-  "Converts screen coordinates to world (physics) coordinates."
-  [[sx sy] zoom [pan-x pan-y]]
-  (let [unzoomed-x (/ (- sx pan-x) zoom)
-        unzoomed-y (/ (- sy pan-y) zoom)]
-    [(/ (- unzoomed-x pivot-x) ui/scale)
-     (/ (- pivot-y unzoomed-y) ui/scale)]))
-
-(defn pivot-screen-pos
-  "Returns the screen position of the main pivot point."
-  [zoom [pan-x pan-y]]
-  [(+ (* pivot-x zoom) pan-x)
-   (+ (* pivot-y zoom) pan-y)])
 
 ;; -----------------------------------------------------------------------------
 ;; Application State
@@ -60,6 +32,10 @@
 
 (defonce *state
   (atom (assoc ui/default-state
+               :canvas-width ui/default-canvas-width
+               :canvas-height ui/default-canvas-height
+               :editing-angle nil
+               :angle-input ""
                :system (engine/make-system
                          (mapv engine/make-pendulum ui/initial-pendulums)))))
 
@@ -70,17 +46,8 @@
 (defn step-simulation! []
   (let [now (System/currentTimeMillis)]
     (swap! *state
-           (fn [{:keys [system trail-duration] :as state}]
-             (let [new-system (engine/step system ui/dt)
-                   positions (engine/bob-positions new-system)
-                   cutoff (- now (* trail-duration 1000))
-                   ;; Add new positions to trails and prune old entries
-                   new-trails (mapv (fn [idx [x y]]
-                                      (let [old-trail (get (:trails state) idx [])
-                                            pruned (filter #(> (:time %) cutoff) old-trail)]
-                                        (conj (vec pruned) {:pos [x y] :time now})))
-                                    (range (count positions))
-                                    positions)]
+           (fn [{:keys [system trail-duration trails] :as state}]
+             (let [[new-system new-trails] (engine/step-with-trails system ui/dt trail-duration trails now)]
                (assoc state :system new-system :trails new-trails))))))
 
 (defn toggle-simulation! []
@@ -91,8 +58,12 @@
                       (assoc state :running false))))))
 
 (defn reset-simulation! []
-  (swap! *state (fn [_]
+  (swap! *state (fn [{:keys [canvas-width canvas-height]}]
                   (assoc ui/default-state
+                         :canvas-width canvas-width
+                         :canvas-height canvas-height
+                         :editing-angle nil
+                         :angle-input ""
                          :system (engine/make-system
                                    (mapv engine/make-pendulum ui/initial-pendulums))))))
 
@@ -111,8 +82,9 @@
 (defn center-view!
   "Resets the view to fit all pendulums centered in the viewport."
   []
-  (let [system (:system @*state)
+  (let [{:keys [system canvas-width canvas-height]} @*state
         pendulums (:pendulums system)
+        [pivot-x pivot-y] (ui/get-pivot canvas-width)
         ;; Calculate max extent (sum of all pendulum lengths)
         max-extent (if (seq pendulums)
                      (reduce + 0.0 (map :length pendulums))
@@ -139,46 +111,6 @@
 ;; Mouse Interaction
 ;; -----------------------------------------------------------------------------
 
-(defn bob-screen-positions
-  "Returns screen coordinates of all bobs."
-  [system zoom pan]
-  (mapv (fn [[x y]]
-          (world->screen [x y] zoom pan))
-        (engine/bob-positions system)))
-
-(defn hit-test-bob
-  "Returns index of bob at (mx, my) or nil if none hit."
-  [system mx my zoom pan]
-  (let [positions (bob-screen-positions system zoom pan)
-        pendulums (:pendulums system)]
-    (first
-      (keep-indexed
-        (fn [idx [bx by]]
-          (let [{:keys [mass]} (nth pendulums idx)
-                base-radius (ui/bob-radius mass)
-                radius (* base-radius zoom)
-                dx (- mx bx)
-                dy (- my by)
-                dist (Math/sqrt (+ (* dx dx) (* dy dy)))]
-            (when (<= dist (+ radius 5.0))
-              idx)))
-        positions))))
-
-(defn pivot-for-pendulum
-  "Returns the pivot point (screen coords) for pendulum at idx."
-  [system idx zoom pan]
-  (if (zero? idx)
-    (pivot-screen-pos zoom pan)
-    (let [positions (bob-screen-positions system zoom pan)]
-      (nth positions (dec idx)))))
-
-(defn angle-from-pivot
-  "Calculates the angle from pivot to mouse position."
-  [[px py] [mx my]]
-  (let [dx (- mx px)
-        dy (- my py)]
-    (Math/atan2 dx dy)))
-
 (defn hit-test-angle-display
   "Returns the index of the pendulum whose angle row was clicked, or nil."
   [system mx my]
@@ -196,34 +128,31 @@
                   idx)))
             (range (count pendulums))))))
 
-(defn prompt-angle-input!
-  "Shows a dialog to input a new angle for the pendulum at the given index."
+(defn start-angle-edit!
+  "Starts inline editing of the angle for the pendulum at the given index."
   [idx]
   (let [{:keys [system]} @*state
         pendulum (get-in system [:pendulums idx])
-        current-degrees (Math/toDegrees (:theta pendulum))
-        input (JOptionPane/showInputDialog
-                nil
-                (format "Enter angle for pendulum %d (degrees):" (inc idx))
-                "Set Angle"
-                JOptionPane/PLAIN_MESSAGE
-                nil
-                nil
-                (format "%.2f" current-degrees))]
-    (when (and input (not (empty? (str input))))
+        display-angle (ui/normalize-angle (:theta pendulum))]
+    (swap! *state assoc
+           :editing-angle idx
+           :angle-input (format "%.2f" display-angle))))
+
+(defn cancel-angle-edit! []
+  (swap! *state assoc :editing-angle nil :angle-input ""))
+
+(defn submit-angle-edit! []
+  (let [{:keys [editing-angle angle-input]} @*state]
+    (when editing-angle
       (try
-        (let [new-degrees (Double/parseDouble (str input))
-              new-theta (Math/toRadians new-degrees)]
-          (swap! *state update :system engine/set-pendulum-angle idx new-theta))
-        (catch NumberFormatException _
-          (JOptionPane/showMessageDialog
-            nil
-            "Please enter a valid number."
-            "Invalid Input"
-            JOptionPane/ERROR_MESSAGE))))))
+        (let [display-angle (Double/parseDouble angle-input)
+              new-theta (ui/display-angle->theta display-angle)]
+          (swap! *state update :system engine/set-pendulum-angle editing-angle new-theta))
+        (catch NumberFormatException _)))
+    (cancel-angle-edit!)))
 
 (defn handle-mouse-down [mx my button]
-  (let [{:keys [running system zoom pan]} @*state]
+  (let [{:keys [running system zoom pan canvas-width]} @*state]
     (cond
       ;; Right-click or middle-click starts panning
       (or (= button 2) (= button 3))
@@ -234,18 +163,18 @@
       (cond
         ;; When not running, check for angle display interaction first
         (and (not running) (hit-test-angle-display system mx my))
-        (prompt-angle-input! (hit-test-angle-display system mx my))
+        (start-angle-edit! (hit-test-angle-display system mx my))
 
         ;; When not running, check for bob selection for dragging
-        (and (not running) (hit-test-bob system mx my zoom pan))
-        (swap! *state assoc :selected (hit-test-bob system mx my zoom pan) :dragging true)
+        (and (not running) (ui/hit-test-bob system mx my zoom pan canvas-width))
+        (swap! *state assoc :selected (ui/hit-test-bob system mx my zoom pan canvas-width) :dragging true)
 
         ;; Otherwise (empty space), start panning
         :else
         (swap! *state assoc :panning true :pan-start [mx my] :selected nil)))))
 
 (defn handle-mouse-move [mx my]
-  (let [{:keys [dragging panning running system selected zoom pan pan-start]} @*state]
+  (let [{:keys [dragging panning running system selected zoom pan pan-start canvas-width]} @*state]
     (cond
       ;; Handle panning
       panning
@@ -259,8 +188,8 @@
 
       ;; Handle bob dragging (when not running)
       (and dragging (not running))
-      (let [pivot (pivot-for-pendulum system selected zoom pan)
-            new-theta (angle-from-pivot pivot [mx my])]
+      (let [pivot (ui/pivot-for-pendulum system selected zoom pan canvas-width)
+            new-theta (ui/angle-from-pivot pivot [mx my])]
         (swap! *state update :system engine/set-pendulum-angle selected new-theta)))))
 
 (defn handle-mouse-up []
@@ -287,7 +216,7 @@
 
 (defn draw-trails
   "Draws fading trails for each pendulum bob."
-  [^Graphics2D g trails trail-duration zoom pan]
+  [^Graphics2D g trails trail-duration zoom pan canvas-width]
   (let [now (System/currentTimeMillis)
         duration-ms (* trail-duration 1000)]
     (.setStroke g (BasicStroke. (float (* 2.0 zoom))))
@@ -297,17 +226,17 @@
           (let [age (- now time)
                 alpha (max 0.0 (- 1.0 (/ (double age) duration-ms)))
                 [x y] pos
-                [sx sy] (world->screen pos zoom pan)
+                [sx sy] (ui/world->screen pos zoom pan canvas-width)
                 radius (* ui/trail-dot-radius zoom)]
             (when (> alpha 0.0)
               (.setColor g (Color. (.getRed color) (.getGreen color) (.getBlue color) (int (* 255 alpha))))
               (.fill g (Ellipse2D$Double. (- sx radius) (- sy radius)
                                           (* 2 radius) (* 2 radius))))))))))
 
-(defn draw-pendulum-system [^Graphics2D g system running zoom pan]
+(defn draw-pendulum-system [^Graphics2D g system running zoom pan canvas-width]
   (let [positions (engine/bob-positions system)
         pendulums (:pendulums system)
-        [piv-sx piv-sy] (pivot-screen-pos zoom pan)]
+        [piv-sx piv-sy] (ui/pivot-screen-pos zoom pan canvas-width)]
 
     ;; Enable antialiasing
     (.setRenderingHint g RenderingHints/KEY_ANTIALIASING RenderingHints/VALUE_ANTIALIAS_ON)
@@ -319,7 +248,7 @@
            bobs positions]
       (when (seq bobs)
         (let [[x y] (first bobs)
-              [screen-x screen-y] (world->screen [x y] zoom pan)
+              [screen-x screen-y] (ui/world->screen [x y] zoom pan canvas-width)
               color (nth colors (mod idx (count colors)))
               {:keys [mass]} (nth pendulums idx)
               base-radius (ui/bob-radius mass)
@@ -355,7 +284,7 @@
 
 (defn draw-angle-display
   "Draws a tabular display of pendulum angles in the top left of the viewport."
-  [^Graphics2D g system]
+  [^Graphics2D g system editing-angle]
   (let [pendulums (:pendulums system)
         font (Font. "Monospaced" Font/PLAIN 14)
         padding 10
@@ -369,16 +298,19 @@
     (doseq [[idx {:keys [theta]}] (map-indexed vector pendulums)]
       (let [y (+ header-y (* (inc idx) line-height))
             color (nth colors (mod idx (count colors)))
-            degrees (Math/toDegrees theta)
-            angle-str (format "%+7.2f°" degrees)]
+            display-angle (ui/normalize-angle theta)
+            angle-str (format "%7.2f°" display-angle)
+            is-editing (= idx editing-angle)]
         ;; Draw color indicator
         (.setColor g color)
         (.fillRect g padding (- y 10) 12 12)
         (.setColor g Color/WHITE)
         (.drawRect g padding (- y 10) 12 12)
-        ;; Draw label and angle
+        ;; Draw label and angle (skip angle value if editing)
         (.setColor g (Color. 200 200 200))
-        (.drawString g (format "    %d      %s" (inc idx) angle-str) (+ padding 12) y)))))
+        (if is-editing
+          (.drawString g (format "    %d      " (inc idx)) (+ padding 12) y)
+          (.drawString g (format "    %d      %s" (inc idx) angle-str) (+ padding 12) y))))))
 
 ;; -----------------------------------------------------------------------------
 ;; UI Components
@@ -397,17 +329,73 @@
         (actionPerformed [_ _] (on-click))))))
 
 (defn create-canvas [*state]
-  (let [panel (proxy [JPanel] []
+  (let [;; Create the inline angle input field
+        angle-input-field (doto (JTextField. 8)
+                            (.setFont (Font. "Monospaced" Font/PLAIN 12))
+                            (.setBackground (Color. 0x30 0x30 0x30))
+                            (.setForeground (Color. 0xc8 0xc8 0xc8))
+                            (.setBorder (javax.swing.BorderFactory/createLineBorder (Color. 0x40 0x40 0x40)))
+                            (.setVisible false))
+        panel (proxy [JPanel] []
                 (paintComponent [^Graphics2D g]
                   (proxy-super paintComponent g)
-                  (let [{:keys [system running zoom pan trails trail-duration]} @*state]
+                  (let [{:keys [system running zoom pan trails trail-duration canvas-width canvas-height editing-angle]} @*state]
                     (.setColor g bg-color)
                     (.fillRect g 0 0 canvas-width canvas-height)
-                    (draw-trails g trails trail-duration zoom pan)
-                    (draw-pendulum-system g system running zoom pan)
-                    (draw-angle-display g system))))]
-    (.setPreferredSize panel (Dimension. canvas-width canvas-height))
+                    (draw-trails g trails trail-duration zoom pan canvas-width)
+                    (draw-pendulum-system g system running zoom pan canvas-width)
+                    (draw-angle-display g system editing-angle))))]
+    ;; Use null layout for absolute positioning of the text field
+    (.setLayout panel nil)
+    (.add panel angle-input-field)
+    (.setPreferredSize panel (Dimension. ui/default-canvas-width ui/default-canvas-height))
     (.setBackground panel bg-color)
+
+    ;; Add key listener to the input field
+    (.addKeyListener angle-input-field
+      (proxy [KeyAdapter] []
+        (keyPressed [e]
+          (case (.getKeyCode e)
+            KeyEvent/VK_ENTER (do
+                                (submit-angle-edit!)
+                                (.setVisible angle-input-field false)
+                                (.repaint panel))
+            KeyEvent/VK_ESCAPE (do
+                                 (cancel-angle-edit!)
+                                 (.setVisible angle-input-field false)
+                                 (.repaint panel))
+            nil))))
+
+    ;; Add document listener to sync text field with state
+    (.addDocumentListener (.getDocument angle-input-field)
+      (reify DocumentListener
+        (insertUpdate [_ _] (swap! *state assoc :angle-input (.getText angle-input-field)))
+        (removeUpdate [_ _] (swap! *state assoc :angle-input (.getText angle-input-field)))
+        (changedUpdate [_ _] nil)))
+
+    ;; Watch state to show/hide and update the input field
+    (add-watch *state :angle-input-watcher
+      (fn [_ _ old-state new-state]
+        (let [old-editing (:editing-angle old-state)
+              new-editing (:editing-angle new-state)]
+          (when (not= old-editing new-editing)
+            (if new-editing
+              ;; Show the input field positioned at the correct row
+              (let [padding 10
+                    line-height 20
+                    header-y (+ padding line-height)
+                    row-y (+ header-y (* (inc new-editing) line-height))
+                    input-x 75  ; After "X     " text
+                    input-y (- row-y 14)]
+                (.setText angle-input-field (:angle-input new-state))
+                (.setBounds angle-input-field input-x input-y 70 18)
+                (.setVisible angle-input-field true)
+                (.requestFocus angle-input-field)
+                (.selectAll angle-input-field))
+              ;; Hide the input field
+              (.setVisible angle-input-field false))
+            (.repaint panel)))))
+
     (.addMouseListener panel
       (proxy [MouseAdapter] []
         (mousePressed [e]
@@ -426,6 +414,13 @@
         (mouseWheelMoved [_ e]
           (handle-mouse-wheel (.getX e) (.getY e) (.getWheelRotation e))
           (.repaint panel))))
+    (.addComponentListener panel
+      (proxy [ComponentAdapter] []
+        (componentResized [e]
+          (let [w (.getWidth panel)
+                h (.getHeight panel)]
+            (when (and (pos? w) (pos? h))
+              (swap! *state assoc :canvas-width w :canvas-height h))))))
     panel))
 
 (defn create-trail-slider [*state]
