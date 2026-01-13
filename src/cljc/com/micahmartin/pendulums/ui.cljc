@@ -225,3 +225,14 @@
   [display-angle]
   ;; Reverse of normalize-angle: negate to convert from clockwise to counter-clockwise
   (* (- 180 display-angle) (/ math/PI 180)))
+
+;; -----------------------------------------------------------------------------
+;; State Transformations
+;; -----------------------------------------------------------------------------
+
+(defn add-pendulum
+  "Adds a new pendulum to the system with default configuration. Clears trails."
+  [state]
+  (-> state
+      (update :system engine/add-pendulum (engine/make-pendulum new-pendulum-config))
+      (assoc :trails [])))

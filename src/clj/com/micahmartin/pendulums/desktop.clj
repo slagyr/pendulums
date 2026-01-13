@@ -69,10 +69,7 @@
                                    (mapv engine/make-pendulum ui/initial-pendulums))))))
 
 (defn add-pendulum! []
-  (swap! *state (fn [state]
-                  (-> state
-                      (update :system engine/add-pendulum (engine/make-pendulum ui/new-pendulum-config))
-                      (assoc :trails [])))))
+  (swap! *state ui/add-pendulum))
 
 (defn remove-pendulum! []
   (swap! *state (fn [state]

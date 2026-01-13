@@ -57,12 +57,8 @@
     (stop-simulation!)
     (start-simulation!)))
 
-;; TODO - MDM: move to ui
 (defn add-pendulum! []
-  (swap! app-state (fn [state]
-                     (-> state
-                         (update :system engine/add-pendulum (engine/make-pendulum ui/new-pendulum-config))
-                         (assoc :trails [])))))
+  (swap! app-state ui/add-pendulum))
 
 ;; TODO - MDM: move to ui
 (defn remove-pendulum! []
