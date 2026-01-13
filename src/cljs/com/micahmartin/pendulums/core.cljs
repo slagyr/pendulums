@@ -15,7 +15,16 @@
 (def dt 0.016)  ; ~60 fps simulation step
 
 ;; Colors for pendulum chain
-(def colors ["#ef4444" "#3b82f6" "#22c55e" "#f97316" "#a855f7"])
+(def colors ["#ef4444"   ; red
+             "#3b82f6"   ; blue
+             "#22c55e"   ; green
+             "#f97316"   ; orange
+             "#a855f7"   ; purple
+             "#eab308"   ; yellow
+             "#06b6d4"   ; cyan
+             "#ec4899"   ; pink
+             "#6366f1"   ; indigo
+             "#84cc16"]) ; lime
 
 ;; -----------------------------------------------------------------------------
 ;; Coordinate Transformations
