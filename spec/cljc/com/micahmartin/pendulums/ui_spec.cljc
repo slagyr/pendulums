@@ -84,6 +84,13 @@
       (should= [] (:trails ui/default-state))
       (should= 3.0 (:trail-duration ui/default-state)))
 
+    (it "has default system with initial pendulums"
+      (let [system (:system ui/default-state)]
+        (should-not-be-nil system)
+        (should= 2 (count (:pendulums system)))
+        (should= 0.8 (:theta (first (:pendulums system))))
+        (should= 0.5 (:theta (second (:pendulums system))))))
+
     (it "has initial pendulum configurations"
       (should= 2 (count ui/initial-pendulums))
       (should= {:theta 0.8 :length 1.0} (first ui/initial-pendulums))

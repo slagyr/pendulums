@@ -102,7 +102,9 @@
    :panning false
    :pan-start nil
    :trails []
-   :trail-duration default-trail-duration})
+   :trail-duration default-trail-duration
+   :system (engine/make-system
+             (mapv engine/make-pendulum initial-pendulums))})
 
 ;; Pre-computed CSS color strings for convenience
 (def pendulum-colors-css (mapv hex->css pendulum-colors))

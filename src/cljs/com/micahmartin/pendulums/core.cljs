@@ -18,10 +18,7 @@
 
 (defonce app-state
   (r/atom (merge ui/default-state
-                 {:system (engine/make-system
-                            (mapv engine/make-pendulum ui/initial-pendulums))
-                  ;; TODO - MDM: :system can be part of the ui/default-state
-                  :animation-id nil
+                 {:animation-id nil
                   :editing-angle nil
                   :angle-input ""
                   :canvas-width ui/default-canvas-width
