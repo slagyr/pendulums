@@ -14,12 +14,13 @@
 ;; -----------------------------------------------------------------------------
 ;; Coordinate Transformations
 ;; -----------------------------------------------------------------------------
-
+;; TODO - MDM: Move to ui.cljc
 (defn get-pivot
   "Returns [pivot-x pivot-y] based on canvas width."
   [canvas-width]
   [(/ canvas-width 2) ui/pivot-y-offset])
 
+;; TODO - MDM: Move to ui.cljc
 (defn world->screen
   "Converts world (physics) coordinates to screen coordinates."
   [[wx wy] zoom [pan-x pan-y] canvas-width]
@@ -27,6 +28,7 @@
     [(+ (* (+ pivot-x (* wx ui/scale)) zoom) pan-x)
      (+ (* (- pivot-y (* wy ui/scale)) zoom) pan-y)]))
 
+;; TODO - MDM: Move to ui.cljc
 (defn screen->world
   "Converts screen coordinates to world (physics) coordinates."
   [[sx sy] zoom [pan-x pan-y] canvas-width]
@@ -36,6 +38,7 @@
     [(/ (- unzoomed-x pivot-x) ui/scale)
      (/ (- pivot-y unzoomed-y) ui/scale)]))
 
+;; TODO - MDM: Move to ui.cljc
 (defn pivot-screen-pos
   "Returns the screen position of the main pivot point."
   [zoom [pan-x pan-y] canvas-width]
@@ -51,6 +54,7 @@
   (r/atom (merge ui/default-state
                  {:system (engine/make-system
                             (mapv engine/make-pendulum ui/initial-pendulums))
+                  ;; TODO - MDM: :system can be part of the ui/default-state
                   :animation-id nil
                   :editing-angle nil
                   :angle-input ""
@@ -61,8 +65,9 @@
 ;; Simulation Control
 ;; -----------------------------------------------------------------------------
 
+;; TODO - MDM: This fn has lots of feature-envy.  It seems like it should go in engine.
 (defn step-simulation! []
-  (let [now (.now js/Date)]
+  (let [now (.now js/Date)]                                 ;; TODO - MDM: use c3kit.time.now instead of js/Date
     (swap! app-state
            (fn [{:keys [system trail-duration] :as state}]
              (let [new-system (engine/step system ui/dt)
@@ -98,6 +103,7 @@
     (stop-simulation!)
     (start-simulation!)))
 
+;; TODO - MDM: Delete ME
 (defn reset-simulation! []
   (stop-simulation!)
   (swap! app-state (fn [state]
@@ -105,18 +111,21 @@
                             {:system (engine/make-system
                                        (mapv engine/make-pendulum ui/initial-pendulums))}))))
 
+;; TODO - MDM: move to ui
 (defn add-pendulum! []
   (swap! app-state (fn [state]
                      (-> state
                          (update :system engine/add-pendulum (engine/make-pendulum ui/new-pendulum-config))
                          (assoc :trails [])))))
 
+;; TODO - MDM: move to ui
 (defn remove-pendulum! []
   (swap! app-state (fn [state]
                      (-> state
                          (update :system engine/remove-pendulum)
                          (assoc :trails [])))))
 
+;; TODO - MDM: There doesn't seem to be anything web-specific here.  Move to ui.
 (defn center-view!
   "Resets the view to fit all pendulums centered in the viewport."
   []
@@ -159,6 +168,7 @@
     [(- (.-clientX e) (.-left rect))
      (- (.-clientY e) (.-top rect))]))
 
+;; TODO - MDM: move to ui
 (defn bob-screen-positions
   "Returns screen coordinates of all bobs."
   [system zoom pan canvas-width]
@@ -166,6 +176,7 @@
           (world->screen [x y] zoom pan canvas-width))
         (engine/bob-positions system)))
 
+;; TODO - MDM: move to ui
 (defn hit-test-bob
   "Returns index of bob at (mx, my) or nil if none hit."
   [system mx my zoom pan canvas-width]
@@ -184,6 +195,7 @@
               idx)))
         positions))))
 
+;; TODO - MDM: move to ui
 (defn pivot-for-pendulum
   "Returns the pivot point (screen coords) for pendulum at idx.
    For idx 0, it's the main pivot. For idx > 0, it's the previous bob."
@@ -193,6 +205,7 @@
     (let [positions (bob-screen-positions system zoom pan canvas-width)]
       (nth positions (dec idx)))))
 
+;; TODO - MDM: move to ui
 (defn angle-from-pivot
   "Calculates the angle from pivot to mouse position.
    Returns angle in radians where 0 = hanging down, positive = clockwise."
@@ -201,6 +214,7 @@
         dy (- my py)]  ; positive dy = below pivot (in screen coords)
     (js/Math.atan2 dx dy)))
 
+;; TODO - MDM: If we pass in coordinates instead of e and canvas, the fn can be moved to ui
 (defn handle-mouse-down [e canvas]
   (let [[mx my] (get-canvas-coords e canvas)
         {:keys [running system zoom pan canvas-width]} @app-state
@@ -219,6 +233,7 @@
       :else
       (swap! app-state assoc :selected nil :dragging false :panning true :pan-start [mx my]))))
 
+;; TODO - MDM: If we pass in coordinates instead of e and canvas, the fn can be moved to ui
 (defn handle-mouse-move [e canvas]
   (let [[mx my] (get-canvas-coords e canvas)
         {:keys [dragging panning running system selected zoom pan pan-start canvas-width]} @app-state]
@@ -239,9 +254,11 @@
             new-theta (angle-from-pivot pivot [mx my])]
         (swap! app-state update :system engine/set-pendulum-angle selected new-theta)))))
 
+;; TODO - MDM: move to ui without params
 (defn handle-mouse-up [_e _canvas]
   (swap! app-state assoc :dragging false :panning false :pan-start nil))
 
+;; TODO - MDM: extract the e and canvas and move the rest to ui
 (defn handle-mouse-wheel [e canvas]
   (let [[mx my] (get-canvas-coords e canvas)
         {:keys [zoom pan]} @app-state
@@ -280,6 +297,7 @@
                   idx)))
             (range (count pendulums))))))
 
+;; TODO - MDM: Move to ui
 (defn normalize-angle
   "Converts physics theta to display angle where 0°=up, 90°=right, 180°=down, 270°=left.
    Like a compass heading where angles increase clockwise."
@@ -327,12 +345,14 @@
         (when-not is-editing
           (.fillText ctx angle-str angle-x y))))))
 
+;; TODO - MDM: move to ui
 (defn display-angle->theta
   "Converts display angle (0°=up, 90°=right, 180°=down, 270°=left) back to physics theta."
   [display-angle]
   ;; Reverse of normalize-angle: negate to convert from clockwise to counter-clockwise
   (* (- 180 display-angle) (/ js/Math.PI 180)))
 
+;; TODO - MDM: move to ui
 (defn start-angle-edit!
   "Opens the inline angle editor for the pendulum at idx."
   [idx]
@@ -343,9 +363,11 @@
            :editing-angle idx
            :angle-input (.toFixed display-angle 2))))
 
+;; TODO - MDM: move to ui
 (defn cancel-angle-edit! []
   (swap! app-state assoc :editing-angle nil :angle-input ""))
 
+;; TODO - MDM: extract the parsing so that this fn takes a float and move to ui
 (defn submit-angle-edit! []
   (let [{:keys [editing-angle angle-input]} @app-state]
     (when editing-angle
@@ -359,6 +381,7 @@
 ;; Canvas Rendering
 ;; -----------------------------------------------------------------------------
 
+;; TODO - MDM: move to ui
 (defn hex->rgb
   "Converts a hex color string like '#ef4444' to [r g b]."
   [hex]
