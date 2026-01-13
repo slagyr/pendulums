@@ -586,8 +586,10 @@
               :display "flex"
               :align-items "center"
               :justify-content "center"
-              :padding-left (if running "0" "4px")}}  ; nudge play icon to center
-     (if running "⏸" "▶")]))
+              :padding "0"}}
+     [:span {:style {:display "inline-block"
+                     :transform (if running "none" "translateX(2px)")}}
+      (if running "⏸" "▶")]]))
 
 (defn controls-component []
   (let [{:keys [system trail-duration]} @app-state
