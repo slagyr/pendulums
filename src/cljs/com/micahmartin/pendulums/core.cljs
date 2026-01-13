@@ -85,9 +85,8 @@
   (let [[mx my] (get-canvas-coords e canvas)]
     (swap! app-state ui/handle-mouse-move mx my)))
 
-;; TODO - MDM: move to ui without params
 (defn handle-mouse-up [_e _canvas]
-  (swap! app-state assoc :dragging false :panning false :pan-start nil))
+  (swap! app-state ui/handle-mouse-up))
 
 ;; TODO - MDM: extract the e and canvas and move the rest to ui
 (defn handle-mouse-wheel [e canvas]

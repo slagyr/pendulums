@@ -343,3 +343,8 @@
         (update state :system engine/set-pendulum-angle selected new-theta))
 
       :else state)))
+
+(defn handle-mouse-up
+  "Handles mouse up. Returns updated state with dragging/panning cleared."
+  [state]
+  (assoc state :dragging false :panning false :pan-start nil))

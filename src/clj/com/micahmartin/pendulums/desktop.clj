@@ -111,7 +111,7 @@
   (swap! *state ui/handle-mouse-move mx my))
 
 (defn handle-mouse-up []
-  (swap! *state assoc :dragging false :panning false :pan-start nil))
+  (swap! *state ui/handle-mouse-up))
 
 (defn handle-mouse-wheel
   "Zoom in/out centered on mouse position."
