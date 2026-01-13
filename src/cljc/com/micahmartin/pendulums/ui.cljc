@@ -43,6 +43,34 @@
    (bit-and (bit-shift-right hex 8) 0xff)
    (bit-and hex 0xff)])
 
+;; -----------------------------------------------------------------------------
+;; UI State Defaults
+;; -----------------------------------------------------------------------------
+
+(def default-zoom 1.0)
+(def default-pan [0.0 0.0])
+(def default-trail-duration 3.0)
+
+;; Initial pendulum configurations
+(def initial-pendulums
+  [{:theta 0.8 :length 1.0}
+   {:theta 0.5 :length 1.0}])
+
+;; Configuration for newly added pendulums
+(def new-pendulum-config {:theta 0.3 :length 1.0})
+
+;; Default state map (platform-specific keys should be merged in)
+(def default-state
+  {:running false
+   :selected nil
+   :dragging false
+   :zoom default-zoom
+   :pan default-pan
+   :panning false
+   :pan-start nil
+   :trails []
+   :trail-duration default-trail-duration})
+
 ;; Pre-computed CSS color strings for convenience
 (def pendulum-colors-css (mapv hex->css pendulum-colors))
 (def arm-color-css (hex->css arm-color))
