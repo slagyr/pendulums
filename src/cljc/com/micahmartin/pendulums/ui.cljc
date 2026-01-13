@@ -1,6 +1,37 @@
 (ns com.micahmartin.pendulums.ui)
 
 ;; -----------------------------------------------------------------------------
+;; Simulation Constants
+;; -----------------------------------------------------------------------------
+
+(def dt 0.016)                    ; Simulation time step (~60 fps)
+(def scale 100.0)                 ; Pixels per meter
+
+;; -----------------------------------------------------------------------------
+;; Canvas / Viewport Constants
+;; -----------------------------------------------------------------------------
+
+(def default-canvas-width 800)
+(def default-canvas-height 600)
+(def pivot-y-offset 150.0)        ; Pivot Y position from top
+
+;; -----------------------------------------------------------------------------
+;; Drawing Constants
+;; -----------------------------------------------------------------------------
+
+(def bob-base-radius 8.0)         ; Base bob radius in pixels
+(def bob-radius-per-mass 4.0)     ; Additional radius per unit mass
+(def arm-stroke-width 3.0)        ; Arm line width
+(def bob-outline-width 2.0)       ; Bob outline stroke width
+(def pivot-radius 6.0)            ; Pivot point radius
+(def trail-dot-radius 2.0)        ; Trail dot radius
+
+(defn bob-radius
+  "Calculates bob radius based on mass."
+  [mass]
+  (+ bob-base-radius (* bob-radius-per-mass mass)))
+
+;; -----------------------------------------------------------------------------
 ;; Color Definitions (as hex integers)
 ;; -----------------------------------------------------------------------------
 
