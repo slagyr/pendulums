@@ -591,6 +591,25 @@
                      :transform (if running "none" "translateX(2px)")}}
       (if running "⏸" "▶")]]))
 
+(defn center-button []
+  [:button {:on-click center-view!
+            :title "Center screen"
+            :style {:position "absolute"
+                    :top "10px"
+                    :right "10px"
+                    :width "36px"
+                    :height "36px"
+                    :border-radius "50%"
+                    :border "none"
+                    :background-color "rgba(64, 64, 64, 0.8)"
+                    :color "#fafaf9"
+                    :font-size "18px"
+                    :cursor "pointer"
+                    :display "flex"
+                    :align-items "center"
+                    :justify-content "center"}}
+   "◎"])
+
 (defn controls-component []
   (let [{:keys [system trail-duration]} @app-state
         n (engine/pendulum-count system)
@@ -614,9 +633,6 @@
                 :style {:padding "4px 8px" :cursor "pointer"}} "-"]
       [:span {:style {:color "#c8c8c8" :font-size "12px"}} (str n " pendulums")]]
      [:div {:style {:display "flex" :gap "8px" :align-items "center"}}
-      [:button {:on-click center-view!
-                :style {:padding "4px 8px" :cursor "pointer"}} "Center"]]
-     [:div {:style {:display "flex" :gap "8px" :align-items "center"}}
       [:span {:style {:color "#c8c8c8" :font-size "12px"}} "Trail:"]
       [:input {:type "range"
                :min 0
@@ -634,6 +650,7 @@
     {:style {:position "relative"}}
     [canvas-component]
     [angle-input-component]
+    [center-button]
     [play-pause-button]
     [controls-component]]])
 
