@@ -19,6 +19,30 @@
 (def colors ["#ef4444" "#f97316" "#eab308" "#84cc16" "#22c55e"])
 
 ;; -----------------------------------------------------------------------------
+;; Coordinate Transformations
+;; -----------------------------------------------------------------------------
+
+(defn world->screen
+  "Converts world (physics) coordinates to screen coordinates."
+  [[wx wy] zoom [pan-x pan-y]]
+  [(+ (* (+ pivot-x (* wx scale)) zoom) pan-x)
+   (+ (* (- pivot-y (* wy scale)) zoom) pan-y)])
+
+(defn screen->world
+  "Converts screen coordinates to world (physics) coordinates."
+  [[sx sy] zoom [pan-x pan-y]]
+  (let [unzoomed-x (/ (- sx pan-x) zoom)
+        unzoomed-y (/ (- sy pan-y) zoom)]
+    [(/ (- unzoomed-x pivot-x) scale)
+     (/ (- pivot-y unzoomed-y) scale)]))
+
+(defn pivot-screen-pos
+  "Returns the screen position of the main pivot point."
+  [zoom [pan-x pan-y]]
+  [(+ (* pivot-x zoom) pan-x)
+   (+ (* pivot-y zoom) pan-y)])
+
+;; -----------------------------------------------------------------------------
 ;; Application State
 ;; -----------------------------------------------------------------------------
 
@@ -33,7 +57,11 @@
            :editing-angle nil ; index of pendulum being edited (nil = none)
            :angle-input ""
            :trails []         ; Vector of trails, one per pendulum. Each trail is a list of {:pos [x y] :time ms}
-           :trail-duration 3.0}))
+           :trail-duration 3.0
+           :zoom 1.0          ; Viewport zoom level
+           :pan [0.0 0.0]     ; Viewport pan offset [x y]
+           :panning false     ; true when panning viewport
+           :pan-start nil}))
 
 ;; -----------------------------------------------------------------------------
 ;; Simulation Control
@@ -84,7 +112,11 @@
                     (engine/make-pendulum {:theta 0.5 :length 1.2})])
          :selected nil
          :dragging false
-         :trails []))
+         :trails []
+         :zoom 1.0
+         :pan [0.0 0.0]
+         :panning false
+         :pan-start nil))
 
 (defn add-pendulum! []
   (swap! app-state (fn [state]
@@ -97,6 +129,33 @@
                      (-> state
                          (update :system engine/remove-pendulum)
                          (assoc :trails [])))))
+
+(defn center-view!
+  "Resets the view to fit all pendulums centered in the viewport."
+  []
+  (let [system (:system @app-state)
+        pendulums (:pendulums system)
+        ;; Calculate max extent (sum of all pendulum lengths)
+        max-extent (if (seq pendulums)
+                     (reduce + 0.0 (map :length pendulums))
+                     1.5)
+        ;; Convert to pixels at zoom 1.0
+        extent-pixels (* max-extent scale)
+        ;; The pendulum can swing in all directions, so fit a circle of radius extent-pixels
+        ;; with padding for comfortable viewing
+        padding 120.0
+        required-size (+ (* 2.0 extent-pixels) padding)
+        ;; Calculate zoom to fit in the smaller dimension
+        zoom-for-width (/ canvas-width required-size)
+        zoom-for-height (/ canvas-height required-size)
+        fit-zoom (max 0.2 (min 1.5 (min zoom-for-width zoom-for-height)))
+        ;; Center the pendulum system in the viewport
+        ;; The system extends from pivot-y down to pivot-y + extent-pixels
+        ;; Center on the midpoint: pivot-y + extent-pixels/2
+        system-center-y (+ pivot-y (/ extent-pixels 2.0))
+        pan-x (- (/ canvas-width 2.0) (* pivot-x fit-zoom))
+        pan-y (- (/ canvas-height 2.0) (* system-center-y fit-zoom))]
+    (swap! app-state assoc :zoom fit-zoom :pan [pan-x pan-y])))
 
 ;; -----------------------------------------------------------------------------
 ;; Mouse Interaction
@@ -114,22 +173,22 @@
 
 (defn bob-screen-positions
   "Returns screen coordinates of all bobs."
-  [system]
+  [system zoom pan]
   (mapv (fn [[x y]]
-          [(+ pivot-x (* x scale))
-           (- pivot-y (* y scale))])
+          (world->screen [x y] zoom pan))
         (engine/bob-positions system)))
 
 (defn hit-test-bob
   "Returns index of bob at (mx, my) or nil if none hit."
-  [system mx my]
-  (let [positions (bob-screen-positions system)
+  [system mx my zoom pan]
+  (let [positions (bob-screen-positions system zoom pan)
         pendulums (:pendulums system)]
     (first
       (keep-indexed
         (fn [idx [bx by]]
           (let [{:keys [mass]} (nth pendulums idx)
-                radius (+ 8 (* 4 mass))
+                base-radius (+ 8 (* 4 mass))
+                radius (* base-radius zoom)
                 dx (- mx bx)
                 dy (- my by)
                 dist (js/Math.sqrt (+ (* dx dx) (* dy dy)))]
@@ -140,10 +199,10 @@
 (defn pivot-for-pendulum
   "Returns the pivot point (screen coords) for pendulum at idx.
    For idx 0, it's the main pivot. For idx > 0, it's the previous bob."
-  [system idx]
+  [system idx zoom pan]
   (if (zero? idx)
-    [pivot-x pivot-y]
-    (let [positions (bob-screen-positions system)]
+    (pivot-screen-pos zoom pan)
+    (let [positions (bob-screen-positions system zoom pan)]
       (nth positions (dec idx)))))
 
 (defn angle-from-pivot
@@ -155,35 +214,61 @@
     (js/Math.atan2 dx dy)))
 
 (defn handle-mouse-down [e canvas]
-  (when-not (:running @app-state)
-    (let [[mx my] (get-canvas-coords e canvas)
-          system (:system @app-state)
-          angle-hit (hit-test-angle-display system mx my)
-          hit-idx (hit-test-bob system mx my)]
-      (cond
-        ;; Check for angle display click first
-        angle-hit
-        (start-angle-edit! angle-hit)
+  (let [[mx my] (get-canvas-coords e canvas)
+        {:keys [running system zoom pan]} @app-state
+        angle-hit (hit-test-angle-display system mx my)
+        hit-idx (hit-test-bob system mx my zoom pan)]
+    (cond
+      ;; Check for angle display click first (when not running)
+      (and (not running) angle-hit)
+      (start-angle-edit! angle-hit)
 
-        ;; Bob selection for dragging
-        hit-idx
-        (swap! app-state assoc :selected hit-idx :dragging true)
+      ;; Bob selection for dragging (when not running)
+      (and (not running) hit-idx)
+      (swap! app-state assoc :selected hit-idx :dragging true)
 
-        ;; Clicked on empty space
-        :else
-        (swap! app-state assoc :selected nil :dragging false)))))
+      ;; Clicked on empty space - start panning
+      :else
+      (swap! app-state assoc :selected nil :dragging false :panning true :pan-start [mx my]))))
 
 (defn handle-mouse-move [e canvas]
-  (when (and (:dragging @app-state)
-             (not (:running @app-state)))
-    (let [[mx my] (get-canvas-coords e canvas)
-          {:keys [system selected]} @app-state
-          pivot (pivot-for-pendulum system selected)
-          new-theta (angle-from-pivot pivot [mx my])]
-      (swap! app-state update :system engine/set-pendulum-angle selected new-theta))))
+  (let [[mx my] (get-canvas-coords e canvas)
+        {:keys [dragging panning running system selected zoom pan pan-start]} @app-state]
+    (cond
+      ;; Handle panning
+      panning
+      (let [[start-x start-y] pan-start
+            [pan-x pan-y] pan
+            dx (- mx start-x)
+            dy (- my start-y)]
+        (swap! app-state assoc
+               :pan [(+ pan-x dx) (+ pan-y dy)]
+               :pan-start [mx my]))
+
+      ;; Handle bob dragging (when not running)
+      (and dragging (not running))
+      (let [pivot (pivot-for-pendulum system selected zoom pan)
+            new-theta (angle-from-pivot pivot [mx my])]
+        (swap! app-state update :system engine/set-pendulum-angle selected new-theta)))))
 
 (defn handle-mouse-up [_e _canvas]
-  (swap! app-state assoc :dragging false))
+  (swap! app-state assoc :dragging false :panning false :pan-start nil))
+
+(defn handle-mouse-wheel [e canvas]
+  (let [[mx my] (get-canvas-coords e canvas)
+        {:keys [zoom pan]} @app-state
+        ;; Zoom factor per wheel notch
+        rotation (.-deltaY e)
+        zoom-factor (if (neg? rotation) 1.1 0.9)
+        new-zoom (max 0.1 (min 10.0 (* zoom zoom-factor)))
+        ;; To zoom centered on mouse position:
+        ;; new-pan = mouse - (mouse - pan) * (new-zoom / zoom)
+        [pan-x pan-y] pan
+        scale-ratio (/ new-zoom zoom)
+        new-pan-x (- mx (* scale-ratio (- mx pan-x)))
+        new-pan-y (- my (* scale-ratio (- my pan-y)))]
+    (.preventDefault e)
+    (swap! app-state assoc :zoom new-zoom :pan [new-pan-x new-pan-y])))
 
 ;; -----------------------------------------------------------------------------
 ;; Angle Display
@@ -269,50 +354,48 @@
 
 (defn draw-trails
   "Draws fading trails for each pendulum bob."
-  [ctx trails trail-duration]
+  [ctx trails trail-duration zoom pan]
   (let [now (.now js/Date)
         duration-ms (* trail-duration 1000)]
-    (set! (.-lineWidth ctx) 2)
+    (set! (.-lineWidth ctx) (* 2 zoom))
     (doseq [[idx trail] (map-indexed vector trails)]
       (let [color (nth colors (mod idx (count colors)))
             [r g b] (hex->rgb color)]
         (doseq [{:keys [pos time]} trail]
           (let [age (- now time)
                 alpha (max 0.0 (- 1.0 (/ age duration-ms)))
-                [x y] pos
-                sx (+ pivot-x (* x scale))
-                sy (- pivot-y (* y scale))
-                radius 2]
+                [sx sy] (world->screen pos zoom pan)
+                radius (* 2 zoom)]
             (when (> alpha 0.0)
               (set! (.-fillStyle ctx) (str "rgba(" r "," g "," b "," alpha ")"))
               (.beginPath ctx)
               (.arc ctx sx sy radius 0 (* 2 js/Math.PI))
               (.fill ctx))))))))
 
-(defn draw-pendulum-system [ctx system selected running trails trail-duration]
+(defn draw-pendulum-system [ctx system selected running trails trail-duration zoom pan]
   (let [positions (engine/bob-positions system)
-        pendulums (:pendulums system)]
+        pendulums (:pendulums system)
+        [piv-sx piv-sy] (pivot-screen-pos zoom pan)]
     ;; Clear canvas
     (.clearRect ctx 0 0 canvas-width canvas-height)
 
     ;; Draw trails first (behind the pendulums)
-    (draw-trails ctx trails trail-duration)
+    (draw-trails ctx trails trail-duration zoom pan)
 
     ;; Draw from pivot through each bob
-    (loop [prev-x pivot-x
-           prev-y pivot-y
+    (loop [prev-x piv-sx
+           prev-y piv-sy
            idx 0
            bobs positions]
       (when (seq bobs)
         (let [[x y] (first bobs)
-              screen-x (+ pivot-x (* x scale))
-              screen-y (- pivot-y (* y scale))  ; flip y for screen coords
+              [screen-x screen-y] (world->screen [x y] zoom pan)
               color (nth colors (mod idx (count colors)))
               is-selected (and (not running) (= idx selected))]
 
           ;; Draw arm
           (set! (.-strokeStyle ctx) "#525252")
-          (set! (.-lineWidth ctx) 3)
+          (set! (.-lineWidth ctx) (* 3 zoom))
           (.beginPath ctx)
           (.moveTo ctx prev-x prev-y)
           (.lineTo ctx screen-x screen-y)
@@ -320,7 +403,8 @@
 
           ;; Draw bob
           (let [{:keys [mass]} (nth pendulums idx)
-                radius (+ 8 (* 4 mass))]
+                base-radius (+ 8 (* 4 mass))
+                radius (* base-radius zoom)]
             (set! (.-fillStyle ctx) color)
             (.beginPath ctx)
             (.arc ctx screen-x screen-y radius 0 (* 2 js/Math.PI))
@@ -330,21 +414,22 @@
             (if is-selected
               (do
                 (set! (.-strokeStyle ctx) "#ffcc00")
-                (set! (.-lineWidth ctx) 4))
+                (set! (.-lineWidth ctx) (* 4 zoom)))
               (do
                 (set! (.-strokeStyle ctx) "#ffffff")
-                (set! (.-lineWidth ctx) 2)))
+                (set! (.-lineWidth ctx) (* 2 zoom))))
             (.stroke ctx))
 
           (recur screen-x screen-y (inc idx) (rest bobs)))))
 
     ;; Draw pivot point
-    (set! (.-fillStyle ctx) "#737373")
-    (.beginPath ctx)
-    (.arc ctx pivot-x pivot-y 6 0 (* 2 js/Math.PI))
-    (.fill ctx)
+    (let [pivot-radius (* 6 zoom)]
+      (set! (.-fillStyle ctx) "#737373")
+      (.beginPath ctx)
+      (.arc ctx piv-sx piv-sy pivot-radius 0 (* 2 js/Math.PI))
+      (.fill ctx))
 
-    ;; Draw angle display
+    ;; Draw angle display (not affected by zoom/pan)
     (draw-angle-display ctx system)))
 
 ;; -----------------------------------------------------------------------------
@@ -361,11 +446,11 @@
          (when-let [canvas @canvas-ref]
            (let [ctx (.getContext canvas "2d")]
              (add-watch app-state :render
-                        (fn [_ _ _ {:keys [system selected running trails trail-duration]}]
-                          (draw-pendulum-system ctx system selected running trails trail-duration)))
+                        (fn [_ _ _ {:keys [system selected running trails trail-duration zoom pan]}]
+                          (draw-pendulum-system ctx system selected running trails trail-duration zoom pan)))
              ;; Initial draw
-             (let [{:keys [system selected running trails trail-duration]} @app-state]
-               (draw-pendulum-system ctx system selected running trails trail-duration)))))
+             (let [{:keys [system selected running trails trail-duration zoom pan]} @app-state]
+               (draw-pendulum-system ctx system selected running trails trail-duration zoom pan)))))
 
        :component-will-unmount
        (fn [_]
@@ -382,7 +467,8 @@
                      :on-mouse-down #(when canvas (handle-mouse-down % canvas))
                      :on-mouse-move #(when canvas (handle-mouse-move % canvas))
                      :on-mouse-up #(when canvas (handle-mouse-up % canvas))
-                     :on-mouse-leave #(when canvas (handle-mouse-up % canvas))}]))})))
+                     :on-mouse-leave #(when canvas (handle-mouse-up % canvas))
+                     :on-wheel #(when canvas (handle-mouse-wheel % canvas))}]))})))
 
 (defn angle-input-component []
   (let [{:keys [editing-angle angle-input]} @app-state]
@@ -411,8 +497,11 @@
                   :on-blur cancel-angle-edit!}]
          [:span {:style {:margin-left "4px" :color "#c8c8c8"}} "°"]]))))
 
+(defn set-trail-duration! [duration]
+  (swap! app-state assoc :trail-duration duration))
+
 (defn controls-component []
-  (let [{:keys [running system]} @app-state
+  (let [{:keys [running system trail-duration]} @app-state
         n (engine/pendulum-count system)
         energy (engine/total-energy system)]
     [:div.controls
@@ -423,6 +512,14 @@
      [:button {:on-click remove-pendulum!
                :disabled (< n 2)}
       "- Pendulum"]
+     [:button {:on-click center-view!} "Center"]
+     [:span.status (str "Trail: " (.toFixed trail-duration 1) "s")]
+     [:input {:type "range"
+              :min 0
+              :max 100
+              :value (* trail-duration 10)
+              :style {:width "100px" :vertical-align "middle"}
+              :on-change #(set-trail-duration! (/ (js/parseInt (-> % .-target .-value)) 10.0))}]
      [:span.status (str "Pendulums: " n)]
      [:span.status (str "Energy: " (.toFixed energy 2) " J")]]))
 
