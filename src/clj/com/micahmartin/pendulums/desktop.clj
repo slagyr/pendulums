@@ -108,23 +108,7 @@
     (swap! *state ui/handle-mouse-down mx my)))
 
 (defn handle-mouse-move [mx my]
-  (let [{:keys [dragging panning running system selected zoom pan pan-start canvas-width]} @*state]
-    (cond
-      ;; Handle panning
-      panning
-      (let [[start-x start-y] pan-start
-            [pan-x pan-y] pan
-            dx (- mx start-x)
-            dy (- my start-y)]
-        (swap! *state assoc
-               :pan [(+ pan-x dx) (+ pan-y dy)]
-               :pan-start [mx my]))
-
-      ;; Handle bob dragging (when not running)
-      (and dragging (not running))
-      (let [pivot (ui/pivot-for-pendulum system selected zoom pan canvas-width)
-            new-theta (ui/angle-from-pivot pivot [mx my])]
-        (swap! *state update :system engine/set-pendulum-angle selected new-theta)))))
+  (swap! *state ui/handle-mouse-move mx my))
 
 (defn handle-mouse-up []
   (swap! *state assoc :dragging false :panning false :pan-start nil))

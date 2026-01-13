@@ -320,3 +320,26 @@
       ;; Clicked on empty space - start panning
       :else
       (assoc state :selected nil :dragging false :panning true :pan-start [mx my]))))
+
+(defn handle-mouse-move
+  "Handles mouse move at coordinates (mx, my). Returns updated state."
+  [state mx my]
+  (let [{:keys [dragging panning running system selected zoom pan pan-start canvas-width]} state]
+    (cond
+      ;; Handle panning
+      panning
+      (let [[start-x start-y] pan-start
+            [pan-x pan-y] pan
+            dx (- mx start-x)
+            dy (- my start-y)]
+        (assoc state
+               :pan [(+ pan-x dx) (+ pan-y dy)]
+               :pan-start [mx my]))
+
+      ;; Handle bob dragging (when not running)
+      (and dragging (not running))
+      (let [pivot (pivot-for-pendulum system selected zoom pan canvas-width)
+            new-theta (angle-from-pivot pivot [mx my])]
+        (update state :system engine/set-pendulum-angle selected new-theta))
+
+      :else state)))

@@ -81,26 +81,9 @@
   (let [[mx my] (get-canvas-coords e canvas)]
     (swap! app-state ui/handle-mouse-down mx my)))
 
-;; TODO - MDM: If we pass in coordinates instead of e and canvas, the fn can be moved to ui
 (defn handle-mouse-move [e canvas]
-  (let [[mx my] (get-canvas-coords e canvas)
-        {:keys [dragging panning running system selected zoom pan pan-start canvas-width]} @app-state]
-    (cond
-      ;; Handle panning
-      panning
-      (let [[start-x start-y] pan-start
-            [pan-x pan-y] pan
-            dx (- mx start-x)
-            dy (- my start-y)]
-        (swap! app-state assoc
-               :pan [(+ pan-x dx) (+ pan-y dy)]
-               :pan-start [mx my]))
-
-      ;; Handle bob dragging (when not running)
-      (and dragging (not running))
-      (let [pivot (ui/pivot-for-pendulum system selected zoom pan canvas-width)
-            new-theta (ui/angle-from-pivot pivot [mx my])]
-        (swap! app-state update :system engine/set-pendulum-angle selected new-theta)))))
+  (let [[mx my] (get-canvas-coords e canvas)]
+    (swap! app-state ui/handle-mouse-move mx my)))
 
 ;; TODO - MDM: move to ui without params
 (defn handle-mouse-up [_e _canvas]
