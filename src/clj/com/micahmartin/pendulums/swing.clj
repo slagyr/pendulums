@@ -4,7 +4,8 @@
   (:import [java.awt Color Graphics2D RenderingHints BasicStroke Dimension BorderLayout]
            [java.awt.event MouseAdapter MouseMotionAdapter MouseWheelListener ActionListener]
            [java.awt.geom Ellipse2D$Double Line2D$Double]
-           [javax.swing JFrame JPanel JButton Timer SwingUtilities UIManager]))
+           [javax.swing JFrame JPanel JButton JSlider JLabel Timer SwingUtilities UIManager]
+           [javax.swing.event ChangeListener]))
 
 ;; -----------------------------------------------------------------------------
 ;; Constants
@@ -69,14 +70,29 @@
          :zoom 1.0
          :pan [0.0 0.0]
          :panning false
-         :pan-start nil}))
+         :pan-start nil
+         :trails []              ; Vector of trails, one per pendulum. Each trail is a list of {:pos [x y] :time ms}
+         :trail-duration 3.0}))
 
 ;; -----------------------------------------------------------------------------
 ;; Simulation Control
 ;; -----------------------------------------------------------------------------
 
 (defn step-simulation! []
-  (swap! *state update :system engine/step dt))
+  (let [now (System/currentTimeMillis)]
+    (swap! *state
+           (fn [{:keys [system trail-duration] :as state}]
+             (let [new-system (engine/step system dt)
+                   positions (engine/bob-positions new-system)
+                   cutoff (- now (* trail-duration 1000))
+                   ;; Add new positions to trails and prune old entries
+                   new-trails (mapv (fn [idx [x y]]
+                                      (let [old-trail (get (:trails state) idx [])
+                                            pruned (filter #(> (:time %) cutoff) old-trail)]
+                                        (conj (vec pruned) {:pos [x y] :time now})))
+                                    (range (count positions))
+                                    positions)]
+               (assoc state :system new-system :trails new-trails))))))
 
 (defn toggle-simulation! []
   (swap! *state (fn [state]
@@ -96,15 +112,47 @@
          :zoom 1.0
          :pan [0.0 0.0]
          :panning false
-         :pan-start nil))
+         :pan-start nil
+         :trails []))
 
 (defn add-pendulum! []
-  (swap! *state update :system
-         engine/add-pendulum
-         (engine/make-pendulum {:theta 0.3 :length 1.0})))
+  (swap! *state (fn [state]
+                  (-> state
+                      (update :system engine/add-pendulum (engine/make-pendulum {:theta 0.3 :length 1.0}))
+                      (assoc :trails [])))))
 
 (defn remove-pendulum! []
-  (swap! *state update :system engine/remove-pendulum))
+  (swap! *state (fn [state]
+                  (-> state
+                      (update :system engine/remove-pendulum)
+                      (assoc :trails [])))))
+
+(defn home-view!
+  "Resets the view to fit all pendulums centered in the viewport."
+  []
+  (let [system (:system @*state)
+        pendulums (:pendulums system)
+        ;; Calculate max extent (sum of all pendulum lengths)
+        max-extent (if (seq pendulums)
+                     (reduce + 0.0 (map :length pendulums))
+                     1.5)
+        ;; Convert to pixels at zoom 1.0
+        extent-pixels (* max-extent scale)
+        ;; The pendulum can swing in all directions, so fit a circle of radius extent-pixels
+        ;; with padding for comfortable viewing
+        padding 120.0
+        required-size (+ (* 2.0 extent-pixels) padding)
+        ;; Calculate zoom to fit in the smaller dimension
+        zoom-for-width (/ canvas-width required-size)
+        zoom-for-height (/ canvas-height required-size)
+        fit-zoom (max 0.2 (min 1.5 (min zoom-for-width zoom-for-height)))
+        ;; Center the pendulum system in the viewport
+        ;; The system extends from pivot-y down to pivot-y + extent-pixels
+        ;; Center on the midpoint: pivot-y + extent-pixels/2
+        system-center-y (+ pivot-y (/ extent-pixels 2.0))
+        pan-x (- (/ canvas-width 2.0) (* pivot-x fit-zoom))
+        pan-y (- (/ canvas-height 2.0) (* system-center-y fit-zoom))]
+    (swap! *state assoc :zoom fit-zoom :pan [pan-x pan-y])))
 
 ;; -----------------------------------------------------------------------------
 ;; Mouse Interaction
@@ -205,6 +253,25 @@
 ;; Canvas Rendering
 ;; -----------------------------------------------------------------------------
 
+(defn draw-trails
+  "Draws fading trails for each pendulum bob."
+  [^Graphics2D g trails trail-duration zoom pan]
+  (let [now (System/currentTimeMillis)
+        duration-ms (* trail-duration 1000)]
+    (.setStroke g (BasicStroke. (float (* 2.0 zoom))))
+    (doseq [[idx trail] (map-indexed vector trails)]
+      (let [color (nth colors (mod idx (count colors)))]
+        (doseq [[i {:keys [pos time]}] (map-indexed vector trail)]
+          (let [age (- now time)
+                alpha (max 0.0 (- 1.0 (/ (double age) duration-ms)))
+                [x y] pos
+                [sx sy] (world->screen pos zoom pan)
+                radius (* 2.0 zoom)]
+            (when (> alpha 0.0)
+              (.setColor g (Color. (.getRed color) (.getGreen color) (.getBlue color) (int (* 255 alpha))))
+              (.fill g (Ellipse2D$Double. (- sx radius) (- sy radius)
+                                          (* 2 radius) (* 2 radius))))))))))
+
 (defn draw-pendulum-system [^Graphics2D g system selected running zoom pan]
   (let [positions (engine/bob-positions system)
         pendulums (:pendulums system)
@@ -274,9 +341,10 @@
   (let [panel (proxy [JPanel] []
                 (paintComponent [^Graphics2D g]
                   (proxy-super paintComponent g)
-                  (let [{:keys [system selected running zoom pan]} @*state]
+                  (let [{:keys [system selected running zoom pan trails trail-duration]} @*state]
                     (.setColor g bg-color)
                     (.fillRect g 0 0 canvas-width canvas-height)
+                    (draw-trails g trails trail-duration zoom pan)
                     (draw-pendulum-system g system selected running zoom pan))))]
     (.setPreferredSize panel (Dimension. canvas-width canvas-height))
     (.setBackground panel bg-color)
@@ -300,8 +368,22 @@
           (.repaint panel))))
     panel))
 
+(defn create-trail-slider [*state]
+  (let [slider (JSlider. 0 100 30)  ; 0-10 seconds, starting at 3s (value / 10)
+        label (JLabel. "Trail: 3.0s")]
+    (.setBackground slider (Color. 0x1a 0x1a 0x1a))
+    (.setForeground label btn-fg-color)
+    (.addChangeListener slider
+      (reify ChangeListener
+        (stateChanged [_ _]
+          (let [value (/ (.getValue slider) 10.0)]
+            (.setText label (str "Trail: " (format "%.1f" value) "s"))
+            (swap! *state assoc :trail-duration value)))))
+    {:slider slider :label label}))
+
 (defn create-control-panel [*state canvas play-btn]
-  (let [panel (JPanel.)]
+  (let [panel (JPanel.)
+        {:keys [slider label]} (create-trail-slider *state)]
     (.setBackground panel (Color. 0x1a 0x1a 0x1a))
     (.add panel play-btn)
     (.add panel (create-button "Reset"
@@ -317,6 +399,12 @@
                   (fn []
                     (remove-pendulum!)
                     (.repaint canvas))))
+    (.add panel (create-button "Home"
+                  (fn []
+                    (home-view!)
+                    (.repaint canvas))))
+    (.add panel label)
+    (.add panel slider)
     panel))
 
 ;; -----------------------------------------------------------------------------
