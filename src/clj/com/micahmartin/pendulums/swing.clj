@@ -1,7 +1,7 @@
 (ns com.micahmartin.pendulums.swing
   "Desktop GUI using Swing for coupled pendulum simulation."
   (:require [com.micahmartin.pendulums.engine :as engine])
-  (:import [java.awt Color Graphics2D RenderingHints BasicStroke Dimension BorderLayout]
+  (:import [java.awt Color Graphics2D RenderingHints BasicStroke Dimension BorderLayout Font]
            [java.awt.event MouseAdapter MouseMotionAdapter MouseWheelListener ActionListener]
            [java.awt.geom Ellipse2D$Double Line2D$Double]
            [javax.swing JFrame JPanel JButton JSlider JLabel Timer SwingUtilities UIManager]
@@ -322,6 +322,37 @@
                                   (* 2 pivot-radius) (* 2 pivot-radius))))))
 
 ;; -----------------------------------------------------------------------------
+;; Angle Display
+;; -----------------------------------------------------------------------------
+
+(defn draw-angle-display
+  "Draws a tabular display of pendulum angles in the top left of the viewport."
+  [^Graphics2D g system]
+  (let [pendulums (:pendulums system)
+        font (Font. "Monospaced" Font/PLAIN 14)
+        padding 10
+        line-height 20
+        header-y (+ padding line-height)]
+    (.setFont g font)
+    ;; Header
+    (.setColor g (Color. 200 200 200))
+    (.drawString g "Pendulum    Angle" padding header-y)
+    ;; Draw each pendulum's angle
+    (doseq [[idx {:keys [theta]}] (map-indexed vector pendulums)]
+      (let [y (+ header-y (* (inc idx) line-height))
+            color (nth colors (mod idx (count colors)))
+            degrees (Math/toDegrees theta)
+            angle-str (format "%+7.2f°" degrees)]
+        ;; Draw color indicator
+        (.setColor g color)
+        (.fillRect g padding (- y 10) 12 12)
+        (.setColor g Color/WHITE)
+        (.drawRect g padding (- y 10) 12 12)
+        ;; Draw label and angle
+        (.setColor g (Color. 200 200 200))
+        (.drawString g (format "    %d      %s" (inc idx) angle-str) (+ padding 12) y)))))
+
+;; -----------------------------------------------------------------------------
 ;; UI Components
 ;; -----------------------------------------------------------------------------
 
@@ -345,7 +376,8 @@
                     (.setColor g bg-color)
                     (.fillRect g 0 0 canvas-width canvas-height)
                     (draw-trails g trails trail-duration zoom pan)
-                    (draw-pendulum-system g system selected running zoom pan))))]
+                    (draw-pendulum-system g system selected running zoom pan)
+                    (draw-angle-display g system))))]
     (.setPreferredSize panel (Dimension. canvas-width canvas-height))
     (.setBackground panel bg-color)
     (.addMouseListener panel
