@@ -316,17 +316,73 @@
 ;; UI Components
 ;; -----------------------------------------------------------------------------
 
-(defn create-button [label on-click]
-  (doto (JButton. label)
-    (.setOpaque true)
-    (.setContentAreaFilled true)
-    (.setBorderPainted true)
-    (.setBackground btn-bg-color)
-    (.setForeground btn-fg-color)
-    (.setFocusPainted false)
-    (.addActionListener
-      (reify ActionListener
-        (actionPerformed [_ _] (on-click))))))
+;; Colors for overlay buttons
+(def play-color (Color. 34 197 94))      ; Green for play
+(def pause-color (Color. 245 158 11))    ; Orange for pause
+(def overlay-btn-color (Color. 64 64 64 200))  ; Semi-transparent gray
+
+(defn create-circular-button
+  "Creates a circular button with custom rendering."
+  [diameter bg-color fg-color text on-click]
+  (let [btn (proxy [JButton] []
+              (paintComponent [^Graphics2D g]
+                (.setRenderingHint g RenderingHints/KEY_ANTIALIASING RenderingHints/VALUE_ANTIALIAS_ON)
+                (let [w (.getWidth this)
+                      h (.getHeight this)
+                      bg (if (.getModel this)
+                           (if (.isPressed (.getModel this))
+                             (.darker bg-color)
+                             bg-color)
+                           bg-color)]
+                  (.setColor g bg)
+                  (.fillOval g 0 0 (dec w) (dec h))
+                  (.setColor g fg-color)
+                  (.setFont g (Font. "Dialog" Font/PLAIN 18))
+                  (let [fm (.getFontMetrics g)
+                        tw (.stringWidth fm text)
+                        th (.getHeight fm)
+                        tx (/ (- w tw) 2)
+                        ty (+ (/ (- h th) 2) (.getAscent fm))]
+                    (.drawString g text (int tx) (int ty))))))]
+    (doto btn
+      (.setPreferredSize (Dimension. diameter diameter))
+      (.setSize diameter diameter)
+      (.setContentAreaFilled false)
+      (.setBorderPainted false)
+      (.setFocusPainted false)
+      (.addActionListener
+        (reify ActionListener
+          (actionPerformed [_ _] (on-click)))))))
+
+(defn create-small-button
+  "Creates a small rectangular button for +/- controls."
+  [text on-click]
+  (let [btn (proxy [JButton] []
+              (paintComponent [^Graphics2D g]
+                (.setRenderingHint g RenderingHints/KEY_ANTIALIASING RenderingHints/VALUE_ANTIALIAS_ON)
+                (let [w (.getWidth this)
+                      h (.getHeight this)
+                      bg (if (and (.getModel this) (.isPressed (.getModel this)))
+                           (.darker overlay-btn-color)
+                           overlay-btn-color)]
+                  (.setColor g bg)
+                  (.fillRoundRect g 0 0 (dec w) (dec h) 6 6)
+                  (.setColor g Color/WHITE)
+                  (.setFont g (Font. "Dialog" Font/BOLD 14))
+                  (let [fm (.getFontMetrics g)
+                        tw (.stringWidth fm text)
+                        tx (/ (- w tw) 2)
+                        ty (+ (/ (- h (.getHeight fm)) 2) (.getAscent fm))]
+                    (.drawString g text (int tx) (int ty))))))]
+    (doto btn
+      (.setPreferredSize (Dimension. 28 24))
+      (.setSize 28 24)
+      (.setContentAreaFilled false)
+      (.setBorderPainted false)
+      (.setFocusPainted false)
+      (.addActionListener
+        (reify ActionListener
+          (actionPerformed [_ _] (on-click)))))))
 
 (defn create-canvas [*state]
   (let [;; Create the inline angle input field
@@ -336,6 +392,28 @@
                             (.setForeground (Color. 0xc8 0xc8 0xc8))
                             (.setBorder (javax.swing.BorderFactory/createLineBorder (Color. 0x40 0x40 0x40)))
                             (.setVisible false))
+
+        ;; Play/Pause button (bottom center)
+        play-btn (atom nil)
+        update-play-btn! (fn []
+                           (when @play-btn
+                             (.repaint @play-btn)))
+
+        ;; Pendulum count label
+        count-label (doto (JLabel. "2 pendulums")
+                      (.setForeground (Color. 0xc8 0xc8 0xc8))
+                      (.setFont (Font. "Dialog" Font/PLAIN 12)))
+
+        ;; Trail duration label
+        trail-label (doto (JLabel. "3.0s")
+                      (.setForeground (Color. 0xc8 0xc8 0xc8))
+                      (.setFont (Font. "Dialog" Font/PLAIN 12)))
+
+        ;; Trail slider
+        trail-slider (doto (JSlider. 0 100 30)
+                       (.setOpaque false)
+                       (.setPreferredSize (Dimension. 80 20)))
+
         panel (proxy [JPanel] []
                 (paintComponent [^Graphics2D g]
                   (proxy-super paintComponent g)
@@ -344,123 +422,203 @@
                     (.fillRect g 0 0 canvas-width canvas-height)
                     (draw-trails g trails trail-duration zoom pan canvas-width)
                     (draw-pendulum-system g system running zoom pan canvas-width)
-                    (draw-angle-display g system editing-angle))))]
-    ;; Use null layout for absolute positioning of the text field
+                    (draw-angle-display g system editing-angle))))
+
+        ;; Function to reposition controls when canvas resizes
+        reposition-controls! (fn [w h]
+                               (when (and (pos? w) (pos? h) @play-btn)
+                                 ;; Play button: bottom center
+                                 (.setBounds @play-btn (- (/ w 2) 24) (- h 68) 48 48)
+                                 ;; Center button position set below
+                                 ))
+
+        ;; Create overlay buttons (after panel is defined so we can reference it)
+        minus-btn (create-small-button "-"
+                    (fn []
+                      (remove-pendulum!)
+                      (let [n (engine/pendulum-count (:system @*state))]
+                        (.setText count-label (str n " pendulums")))
+                      (.repaint panel)))
+        plus-btn (create-small-button "+"
+                   (fn []
+                     (add-pendulum!)
+                     (let [n (engine/pendulum-count (:system @*state))]
+                       (.setText count-label (str n " pendulums")))
+                     (.repaint panel)))
+        center-btn (create-circular-button 36 overlay-btn-color Color/WHITE "◎"
+                     (fn []
+                       (center-view!)
+                       (.repaint panel)))]
+
+    ;; Create play button with dynamic color
+    (reset! play-btn
+      (let [btn (proxy [JButton] []
+                  (paintComponent [^Graphics2D g]
+                    (.setRenderingHint g RenderingHints/KEY_ANTIALIASING RenderingHints/VALUE_ANTIALIAS_ON)
+                    (let [w (.getWidth this)
+                          h (.getHeight this)
+                          running (:running @*state)
+                          base-color (if running pause-color play-color)
+                          bg (if (and (.getModel this) (.isPressed (.getModel this)))
+                               (.darker base-color)
+                               base-color)
+                          symbol (if running "⏸" "▶")]
+                      (.setColor g bg)
+                      (.fillOval g 0 0 (dec w) (dec h))
+                      (.setColor g Color/BLACK)
+                      (.setFont g (Font. "Dialog" Font/PLAIN 18))
+                      (let [fm (.getFontMetrics g)
+                            tw (.stringWidth fm symbol)
+                            th (.getHeight fm)
+                            tx (/ (- w tw) 2)
+                            ty (+ (/ (- h th) 2) (.getAscent fm))]
+                        (.drawString g symbol (int (+ tx (if running 0 2))) (int ty))))))]
+        (doto btn
+          (.setPreferredSize (Dimension. 48 48))
+          (.setSize 48 48)
+          (.setContentAreaFilled false)
+          (.setBorderPainted false)
+          (.setFocusPainted false)
+          (.addActionListener
+            (reify ActionListener
+              (actionPerformed [_ _]
+                (toggle-simulation!)
+                (.repaint panel)))))))
+
+    ;; Configure trail slider
+    (.addChangeListener trail-slider
+      (reify ChangeListener
+        (stateChanged [_ _]
+          (let [value (/ (.getValue trail-slider) 10.0)]
+            (.setText trail-label (format "%.1fs" value))
+            (swap! *state assoc :trail-duration value)))))
+
+    ;; Use null layout for absolute positioning
     (.setLayout panel nil)
-    (.add panel angle-input-field)
     (.setPreferredSize panel (Dimension. ui/default-canvas-width ui/default-canvas-height))
     (.setBackground panel bg-color)
 
-    ;; Add key listener to the input field
-    (.addKeyListener angle-input-field
-      (proxy [KeyAdapter] []
-        (keyPressed [e]
-          (case (.getKeyCode e)
-            KeyEvent/VK_ENTER (do
-                                (submit-angle-edit!)
-                                (.setVisible angle-input-field false)
-                                (.repaint panel))
-            KeyEvent/VK_ESCAPE (do
-                                 (cancel-angle-edit!)
-                                 (.setVisible angle-input-field false)
-                                 (.repaint panel))
-            nil))))
+    ;; Add all overlay controls to panel
+    (.add panel angle-input-field)
+    (.add panel @play-btn)
+    (.add panel center-btn)
+    (.add panel minus-btn)
+    (.add panel count-label)
+    (.add panel plus-btn)
+    (.add panel (doto (JLabel. "Trail:")
+                  (.setForeground (Color. 0xc8 0xc8 0xc8))
+                  (.setFont (Font. "Dialog" Font/PLAIN 12))
+                  (.setBounds 0 0 40 20)))  ; Will be repositioned
+    (.add panel trail-slider)
+    (.add panel trail-label)
 
-    ;; Add document listener to sync text field with state
-    (.addDocumentListener (.getDocument angle-input-field)
-      (reify DocumentListener
-        (insertUpdate [_ _] (swap! *state assoc :angle-input (.getText angle-input-field)))
-        (removeUpdate [_ _] (swap! *state assoc :angle-input (.getText angle-input-field)))
-        (changedUpdate [_ _] nil)))
+    ;; Store references for repositioning
+    (let [trail-text-label (.. panel (getComponent 6))]  ; "Trail:" label
 
-    ;; Watch state to show/hide and update the input field
-    (add-watch *state :angle-input-watcher
-      (fn [_ _ old-state new-state]
-        (let [old-editing (:editing-angle old-state)
-              new-editing (:editing-angle new-state)]
-          (when (not= old-editing new-editing)
-            (if new-editing
-              ;; Show the input field positioned at the correct row
-              (let [padding 10
-                    line-height 20
-                    header-y (+ padding line-height)
-                    row-y (+ header-y (* (inc new-editing) line-height))
-                    input-x 75  ; After "X     " text
-                    input-y (- row-y 14)]
-                (.setText angle-input-field (:angle-input new-state))
-                (.setBounds angle-input-field input-x input-y 70 18)
-                (.setVisible angle-input-field true)
-                (.requestFocus angle-input-field)
-                (.selectAll angle-input-field))
-              ;; Hide the input field
-              (.setVisible angle-input-field false))
-            (.repaint panel)))))
+      ;; Add key listener to the input field
+      (.addKeyListener angle-input-field
+        (proxy [KeyAdapter] []
+          (keyPressed [e]
+            (case (.getKeyCode e)
+              KeyEvent/VK_ENTER (do
+                                  (submit-angle-edit!)
+                                  (.setVisible angle-input-field false)
+                                  (.repaint panel))
+              KeyEvent/VK_ESCAPE (do
+                                   (cancel-angle-edit!)
+                                   (.setVisible angle-input-field false)
+                                   (.repaint panel))
+              nil))))
 
-    (.addMouseListener panel
-      (proxy [MouseAdapter] []
-        (mousePressed [e]
-          (handle-mouse-down (.getX e) (.getY e) (.getButton e))
-          (.repaint panel))
-        (mouseReleased [e]
-          (handle-mouse-up)
-          (.repaint panel))))
-    (.addMouseMotionListener panel
-      (proxy [MouseMotionAdapter] []
-        (mouseDragged [e]
-          (handle-mouse-move (.getX e) (.getY e))
-          (.repaint panel))))
-    (.addMouseWheelListener panel
-      (reify MouseWheelListener
-        (mouseWheelMoved [_ e]
-          (handle-mouse-wheel (.getX e) (.getY e) (.getWheelRotation e))
-          (.repaint panel))))
-    (.addComponentListener panel
-      (proxy [ComponentAdapter] []
-        (componentResized [e]
-          (let [w (.getWidth panel)
-                h (.getHeight panel)]
-            (when (and (pos? w) (pos? h))
-              (swap! *state assoc :canvas-width w :canvas-height h))))))
+      ;; Add document listener to sync text field with state
+      (.addDocumentListener (.getDocument angle-input-field)
+        (reify DocumentListener
+          (insertUpdate [_ _] (swap! *state assoc :angle-input (.getText angle-input-field)))
+          (removeUpdate [_ _] (swap! *state assoc :angle-input (.getText angle-input-field)))
+          (changedUpdate [_ _] nil)))
+
+      ;; Watch state to show/hide and update the input field
+      (add-watch *state :angle-input-watcher
+        (fn [_ _ old-state new-state]
+          (let [old-editing (:editing-angle old-state)
+                new-editing (:editing-angle new-state)]
+            (when (not= old-editing new-editing)
+              (if new-editing
+                ;; Show the input field positioned at the correct row
+                (let [padding 10
+                      line-height 20
+                      header-y (+ padding line-height)
+                      row-y (+ header-y (* (inc new-editing) line-height))
+                      input-x 75  ; After "X     " text
+                      input-y (- row-y 14)]
+                  (.setText angle-input-field (:angle-input new-state))
+                  (.setBounds angle-input-field input-x input-y 70 18)
+                  (.setVisible angle-input-field true)
+                  (.requestFocus angle-input-field)
+                  (.selectAll angle-input-field))
+                ;; Hide the input field
+                (.setVisible angle-input-field false))
+              (.repaint panel)))))
+
+      (.addMouseListener panel
+        (proxy [MouseAdapter] []
+          (mousePressed [e]
+            (handle-mouse-down (.getX e) (.getY e) (.getButton e))
+            (.repaint panel))
+          (mouseReleased [e]
+            (handle-mouse-up)
+            (.repaint panel))))
+      (.addMouseMotionListener panel
+        (proxy [MouseMotionAdapter] []
+          (mouseDragged [e]
+            (handle-mouse-move (.getX e) (.getY e))
+            (.repaint panel))))
+      (.addMouseWheelListener panel
+        (reify MouseWheelListener
+          (mouseWheelMoved [_ e]
+            (handle-mouse-wheel (.getX e) (.getY e) (.getWheelRotation e))
+            (.repaint panel))))
+      (.addComponentListener panel
+        (proxy [ComponentAdapter] []
+          (componentResized [e]
+            (let [w (.getWidth panel)
+                  h (.getHeight panel)]
+              (when (and (pos? w) (pos? h))
+                (swap! *state assoc :canvas-width w :canvas-height h)
+                ;; Reposition overlay controls
+                ;; Play button: bottom center
+                (.setBounds @play-btn (- (/ w 2) 24) (- h 68) 48 48)
+                ;; Center button: top right
+                (.setBounds center-btn (- w 46) 10 36 36)
+                ;; Add/remove controls: top center
+                (let [total-width 120  ; approx width of - count +
+                      start-x (- (/ w 2) (/ total-width 2))]
+                  (.setBounds minus-btn (int start-x) 10 28 24)
+                  (.setBounds count-label (int (+ start-x 32)) 12 70 20)
+                  (.setBounds plus-btn (int (+ start-x 95)) 10 28 24))
+                ;; Trail controls: below add/remove
+                (let [start-x (- (/ w 2) 70)]
+                  (.setBounds trail-text-label (int start-x) 42 40 20)
+                  (.setBounds trail-slider (int (+ start-x 40)) 40 80 20)
+                  (.setBounds trail-label (int (+ start-x 125)) 42 35 20)))))))
+
+      ;; Initial positioning
+      (let [w ui/default-canvas-width
+            h ui/default-canvas-height]
+        (.setBounds @play-btn (- (/ w 2) 24) (- h 68) 48 48)
+        (.setBounds center-btn (- w 46) 10 36 36)
+        (let [total-width 120
+              start-x (- (/ w 2) (/ total-width 2))]
+          (.setBounds minus-btn (int start-x) 10 28 24)
+          (.setBounds count-label (int (+ start-x 32)) 12 70 20)
+          (.setBounds plus-btn (int (+ start-x 95)) 10 28 24))
+        (let [start-x (- (/ w 2) 70)]
+          (.setBounds trail-text-label (int start-x) 42 40 20)
+          (.setBounds trail-slider (int (+ start-x 40)) 40 80 20)
+          (.setBounds trail-label (int (+ start-x 125)) 42 35 20))))
+
     panel))
 
-(defn create-trail-slider [*state]
-  (let [slider (JSlider. 0 100 30)  ; 0-10 seconds, starting at 3s (value / 10)
-        label (JLabel. "Trail: 3.0s")]
-    (.setBackground slider (Color. 0x1a 0x1a 0x1a))
-    (.setForeground label btn-fg-color)
-    (.addChangeListener slider
-      (reify ChangeListener
-        (stateChanged [_ _]
-          (let [value (/ (.getValue slider) 10.0)]
-            (.setText label (str "Trail: " (format "%.1f" value) "s"))
-            (swap! *state assoc :trail-duration value)))))
-    {:slider slider :label label}))
-
-(defn create-control-panel [*state canvas play-btn]
-  (let [panel (JPanel.)
-        {:keys [slider label]} (create-trail-slider *state)]
-    (.setBackground panel (Color. 0x1a 0x1a 0x1a))
-    (.add panel play-btn)
-    (.add panel (create-button "Reset"
-                  (fn []
-                    (reset-simulation!)
-                    (.setText play-btn "Play")
-                    (.repaint canvas))))
-    (.add panel (create-button "- Pendulum"
-                  (fn []
-                    (remove-pendulum!)
-                    (.repaint canvas))))
-    (.add panel (create-button "+ Pendulum"
-                  (fn []
-                    (add-pendulum!)
-                    (.repaint canvas))))
-    (.add panel (create-button "Center"
-                  (fn []
-                    (center-view!)
-                    (.repaint canvas))))
-    (.add panel label)
-    (.add panel slider)
-    panel))
 
 ;; -----------------------------------------------------------------------------
 ;; Entry Point
@@ -475,7 +633,6 @@
     (fn []
       (let [frame (JFrame. "Pendulums")
             canvas (create-canvas *state)
-            play-btn (create-button "Play" (fn []))
             timer (Timer. 16
                     (reify ActionListener
                       (actionPerformed [_ _]
@@ -483,17 +640,8 @@
                           (step-simulation!)
                           (.repaint canvas)))))]
 
-        ;; Configure play button action
-        (.addActionListener play-btn
-          (reify ActionListener
-            (actionPerformed [_ _]
-              (toggle-simulation!)
-              (.setText play-btn (if (:running @*state) "Pause" "Play"))
-              (.repaint canvas))))
-
-        ;; Build UI
+        ;; Build UI - canvas fills the entire frame
         (.add (.getContentPane frame) canvas BorderLayout/CENTER)
-        (.add (.getContentPane frame) (create-control-panel *state canvas play-btn) BorderLayout/SOUTH)
 
         ;; Start animation timer
         (.start timer)
