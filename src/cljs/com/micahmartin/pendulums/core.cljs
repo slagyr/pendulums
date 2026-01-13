@@ -57,14 +57,6 @@
     (stop-simulation!)
     (start-simulation!)))
 
-;; TODO - MDM: Delete ME
-(defn reset-simulation! []
-  (stop-simulation!)
-  (swap! app-state (fn [state]
-                     (merge state ui/default-state
-                            {:system (engine/make-system
-                                       (mapv engine/make-pendulum ui/initial-pendulums))}))))
-
 ;; TODO - MDM: move to ui
 (defn add-pendulum! []
   (swap! app-state (fn [state]
