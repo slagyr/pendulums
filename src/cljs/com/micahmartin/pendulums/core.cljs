@@ -487,8 +487,6 @@
 
        :component-did-mount
        (fn [_]
-         ;; Set initial size from container
-         (update-canvas-size! container-ref)
          ;; Set up resize listener
          (reset! resize-handler (fn [] (update-canvas-size! container-ref)))
          (.addEventListener js/window "resize" @resize-handler)
@@ -498,9 +496,13 @@
              (add-watch app-state :render
                         (fn [_ _ _ {:keys [system running trails trail-duration zoom pan canvas-width canvas-height editing-angle]}]
                           (draw-pendulum-system ctx system running trails trail-duration zoom pan canvas-width canvas-height editing-angle)))
-             ;; Initial draw
-             (let [{:keys [system running trails trail-duration zoom pan canvas-width canvas-height editing-angle]} @app-state]
-               (draw-pendulum-system ctx system running trails trail-duration zoom pan canvas-width canvas-height editing-angle)))))
+             ;; Update canvas size and draw after React finishes rendering
+             ;; (changing canvas dimensions clears it, so we must draw after)
+             (js/requestAnimationFrame
+               (fn []
+                 (update-canvas-size! container-ref)
+                 (let [{:keys [system running trails trail-duration zoom pan canvas-width canvas-height editing-angle]} @app-state]
+                   (draw-pendulum-system ctx system running trails trail-duration zoom pan canvas-width canvas-height editing-angle)))))))
 
        :component-will-unmount
        (fn [_]
