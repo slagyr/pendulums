@@ -14,8 +14,8 @@
 (def pivot-y-offset 150)  ; pivot is 150px from top
 (def dt 0.016)  ; ~60 fps simulation step
 
-;; Colors for pendulum chain (warm sunset gradient)
-(def colors ["#ef4444" "#f97316" "#eab308" "#84cc16" "#22c55e"])
+;; Colors for pendulum chain
+(def colors ["#ef4444" "#3b82f6" "#22c55e" "#f97316" "#a855f7"])
 
 ;; -----------------------------------------------------------------------------
 ;; Coordinate Transformations
