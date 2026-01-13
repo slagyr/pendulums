@@ -127,7 +127,7 @@
                       (update :system engine/remove-pendulum)
                       (assoc :trails [])))))
 
-(defn home-view!
+(defn center-view!
   "Resets the view to fit all pendulums centered in the viewport."
   []
   (let [system (:system @*state)
@@ -431,9 +431,9 @@
                   (fn []
                     (remove-pendulum!)
                     (.repaint canvas))))
-    (.add panel (create-button "Home"
+    (.add panel (create-button "Center"
                   (fn []
-                    (home-view!)
+                    (center-view!)
                     (.repaint canvas))))
     (.add panel label)
     (.add panel slider)
