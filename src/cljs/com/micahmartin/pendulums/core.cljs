@@ -469,14 +469,18 @@
 ;; -----------------------------------------------------------------------------
 
 (defn update-canvas-size!
-  "Updates canvas size to fill the container."
-  [container-ref]
+  "Updates canvas size to fill the container. Sets dimensions directly on
+   the canvas DOM element to avoid React re-render clearing the canvas."
+  [container-ref canvas-ref]
   (when-let [container @container-ref]
-    (let [rect (.getBoundingClientRect container)
-          w (.-width rect)
-          h (.-height rect)]
-      (when (and (pos? w) (pos? h))
-        (swap! app-state assoc :canvas-width w :canvas-height h)))))
+    (when-let [canvas @canvas-ref]
+      (let [rect (.getBoundingClientRect container)
+            w (.-width rect)
+            h (.-height rect)]
+        (when (and (pos? w) (pos? h))
+          (set! (.-width canvas) w)
+          (set! (.-height canvas) h)
+          (swap! app-state assoc :canvas-width w :canvas-height h))))))
 
 (defn canvas-component []
   (let [canvas-ref (r/atom nil)
@@ -487,8 +491,8 @@
 
        :component-did-mount
        (fn [_]
-         ;; Set up resize listener
-         (reset! resize-handler (fn [] (update-canvas-size! container-ref)))
+         ;; Set up resize listener (state update triggers watch which redraws)
+         (reset! resize-handler #(update-canvas-size! container-ref canvas-ref))
          (.addEventListener js/window "resize" @resize-handler)
          ;; Set up render watch
          (when-let [canvas @canvas-ref]
@@ -496,13 +500,10 @@
              (add-watch app-state :render
                         (fn [_ _ _ {:keys [system running trails trail-duration zoom pan canvas-width canvas-height editing-angle]}]
                           (draw-pendulum-system ctx system running trails trail-duration zoom pan canvas-width canvas-height editing-angle)))
-             ;; Update canvas size and draw after React finishes rendering
-             ;; (changing canvas dimensions clears it, so we must draw after)
-             (js/requestAnimationFrame
-               (fn []
-                 (update-canvas-size! container-ref)
-                 (let [{:keys [system running trails trail-duration zoom pan canvas-width canvas-height editing-angle]} @app-state]
-                   (draw-pendulum-system ctx system running trails trail-duration zoom pan canvas-width canvas-height editing-angle)))))))
+             ;; Set canvas size directly on DOM and draw immediately
+             (update-canvas-size! container-ref canvas-ref)
+             (let [{:keys [system running trails trail-duration zoom pan canvas-width canvas-height editing-angle]} @app-state]
+               (draw-pendulum-system ctx system running trails trail-duration zoom pan canvas-width canvas-height editing-angle)))))
 
        :component-will-unmount
        (fn [_]
@@ -513,13 +514,13 @@
        :reagent-render
        (fn []
          (let [canvas @canvas-ref
-               {:keys [running canvas-width canvas-height]} @app-state]
+               {:keys [running]} @app-state]
            [:div.canvas-container
             {:ref #(reset! container-ref %)
              :style {:width "100%" :height "100%"}}
+            ;; Canvas dimensions set via DOM in update-canvas-size! to avoid
+            ;; React re-renders clearing the canvas
             [:canvas {:ref #(reset! canvas-ref %)
-                      :width canvas-width
-                      :height canvas-height
                       :style {:cursor (if running "default" "pointer")
                               :display "block"}
                       :on-mouse-down #(when canvas (handle-mouse-down % canvas))
