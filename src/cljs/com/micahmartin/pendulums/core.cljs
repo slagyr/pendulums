@@ -1,6 +1,7 @@
 (ns com.micahmartin.pendulums.core
   "Web UI entry point using Reagent."
-  (:require [reagent.core :as r]
+  (:require [c3kit.apron.time :as time]
+            [reagent.core :as r]
             [reagent.dom :as rdom]
             [com.micahmartin.pendulums.engine :as engine]
             [com.micahmartin.pendulums.ui :as ui]))
@@ -29,7 +30,7 @@
 ;; -----------------------------------------------------------------------------
 
 (defn step-simulation! []
-  (let [now (.now js/Date)]
+  (let [now (time/now)]
     (swap! app-state
            (fn [{:keys [system trail-duration trails] :as state}]
              (let [[new-system new-trails] (engine/step-with-trails system ui/dt trail-duration trails now)]
@@ -281,7 +282,7 @@
 (defn draw-trails
   "Draws fading trails for each pendulum bob."
   [ctx trails trail-duration zoom pan canvas-width]
-  (let [now (.now js/Date)
+  (let [now (time/now)
         duration-ms (* trail-duration 1000)]
     (set! (.-lineWidth ctx) (* 2 zoom))
     (doseq [[idx trail] (map-indexed vector trails)]
