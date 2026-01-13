@@ -302,6 +302,11 @@
            :editing-angle idx
            :angle-input (format-angle display-angle))))
 
+(defn cancel-angle-edit
+  "Cancels angle editing. Returns updated state."
+  [state]
+  (assoc state :editing-angle nil :angle-input ""))
+
 (defn handle-mouse-down
   "Handles mouse down at coordinates (mx, my). Returns updated state."
   [state mx my]

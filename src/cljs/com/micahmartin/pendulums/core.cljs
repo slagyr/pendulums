@@ -137,9 +137,8 @@
 (defn start-angle-edit! [idx]
   (swap! app-state ui/start-angle-edit idx))
 
-;; TODO - MDM: move to ui
 (defn cancel-angle-edit! []
-  (swap! app-state assoc :editing-angle nil :angle-input ""))
+  (swap! app-state ui/cancel-angle-edit))
 
 ;; TODO - MDM: extract the parsing so that this fn takes a float and move to ui
 (defn submit-angle-edit! []

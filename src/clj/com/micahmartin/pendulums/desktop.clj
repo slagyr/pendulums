@@ -85,7 +85,7 @@
   (swap! *state ui/start-angle-edit idx))
 
 (defn cancel-angle-edit! []
-  (swap! *state assoc :editing-angle nil :angle-input ""))
+  (swap! *state ui/cancel-angle-edit))
 
 (defn submit-angle-edit! []
   (let [{:keys [editing-angle angle-input]} @*state]
