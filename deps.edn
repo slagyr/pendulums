@@ -1,26 +1,21 @@
 {:paths ["src/clj" "src/cljc" "resources"]
 
- :deps {org.clojure/clojure {:mvn/version "1.12.4"}}
+ :deps  {org.clojure/clojure {:mvn/version "1.12.4"}}
 
  :aliases
- {:dev {:extra-paths ["dev"]}
-
-  ;; ClojureScript compilation (requires Java 21+)
-  :cljs {:extra-deps {org.clojure/clojurescript {:mvn/version "1.12.134"}
-                      reagent/reagent {:mvn/version "2.0.1"}
-                      cljsjs/react {:mvn/version "18.2.0-1"}
-                      cljsjs/react-dom {:mvn/version "18.2.0-1"}
-                      com.cleancoders.c3kit/scaffold {:mvn/version "1.0.10"}}
-         :extra-paths ["src/cljs" "src/cljc"]}
-
-  ;; Desktop GUI with Swing
-  :gui {:main-opts ["-m" "com.micahmartin.pendulums.swing"]}
-
-  ;; JVM specs with Speclj
-  :spec {:extra-deps {speclj/speclj {:mvn/version "3.12.0"}}
-         :extra-paths ["spec/clj" "spec/cljc" "src/cljc"]
-         :main-opts ["-m" "speclj.main" "-c"]}
-
-  ;; CLJS specs (use with :cljs alias, e.g., clj -M:cljs:test)
-  :test {:extra-deps {speclj/speclj {:mvn/version "3.12.0"}}
-         :extra-paths ["spec/cljc"]}}}
+ {
+  :test {:extra-paths ["src/cljs" "spec/clj" "spec/cljc" "spec/cljs" "dev"]
+         :extra-deps  {
+                       cljsjs/react                   {:mvn/version "18.2.0-1"}
+                       cljsjs/react-dom               {:mvn/version "18.2.0-1"}
+                       com.cleancoders.c3kit/scaffold {:mvn/version "2.2.0"}
+                       com.cleancoders.c3kit/wire     {:mvn/version "2.5.3"}
+                       org.clojure/clojurescript      {:mvn/version "1.12.134"}
+                       reagent/reagent                {:mvn/version "2.0.1"}
+                       speclj/speclj                  {:mvn/version "3.12.0"}
+                       }}
+  :cljs {:main-opts ["-m" "c3kit.scaffold.cljs"]}
+  :gui  {:main-opts ["-m" "com.micahmartin.pendulums.swing"]}
+  :spec {:main-opts ["-m" "speclj.main" "-c"]}
+  }
+ }

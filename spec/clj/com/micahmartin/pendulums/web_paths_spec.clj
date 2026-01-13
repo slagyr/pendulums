@@ -12,7 +12,7 @@
   "Extracts href and src attribute values from HTML content."
   [html]
   (let [href-pattern #"href=\"([^\"]+)\""
-        src-pattern #"src=\"([^\"]+)\""]
+        src-pattern  #"src=\"([^\"]+)\""]
     (concat (map second (re-seq href-pattern html))
             (map second (re-seq src-pattern html)))))
 
@@ -21,7 +21,7 @@
   [path]
   (if (or (str/starts-with? path "http://")
           (str/starts-with? path "https://"))
-    true  ; external URLs are not validated
+    true                                                    ; external URLs are not validated
     (let [file (io/file web-dir path)]
       (.exists file))))
 
@@ -31,15 +31,15 @@
     (should (.exists index-html)))
 
   (it "all referenced CSS files exist"
-    (let [html (slurp index-html)
-          paths (extract-paths html)
+    (let [html      (slurp index-html)
+          paths     (extract-paths html)
           css-paths (filter #(str/ends-with? % ".css") paths)]
       (doseq [path css-paths]
         (should (valid-resource-path? path)))))
 
   (it "all referenced JS files exist"
-    (let [html (slurp index-html)
-          paths (extract-paths html)
+    (let [html     (slurp index-html)
+          paths    (extract-paths html)
           js-paths (filter #(str/ends-with? % ".js") paths)]
       (doseq [path js-paths]
         (should (valid-resource-path? path)))))

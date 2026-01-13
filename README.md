@@ -31,3 +31,23 @@ Built using Reagent.  This is a static SPA (Single Page Application) allowing th
 ### Desktop GUI
 
 Built using Swing allowing the app to be run as a desktop application.
+
+## Development
+
+### Common commands
+```shell
+# run the specs
+clj -M:test:spec
+
+# transpile the cljs and run specs once
+clj -M:test:cljs once
+
+# Automatically transpile the cljs and run specs on each update
+clj -M:test:cljs
+
+# run the web app
+open web/index.html
+
+# run the desktop app
+clj -M:gui 
+```
