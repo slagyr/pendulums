@@ -113,20 +113,8 @@
 (defn handle-mouse-up []
   (swap! *state ui/handle-mouse-up))
 
-(defn handle-mouse-wheel
-  "Zoom in/out centered on mouse position."
-  [mx my rotation]
-  (let [{:keys [zoom pan]} @*state
-        ;; Zoom factor per wheel notch
-        zoom-factor (if (neg? rotation) 1.1 0.9)
-        new-zoom (max 0.1 (min 10.0 (* zoom zoom-factor)))
-        ;; To zoom centered on mouse position:
-        ;; new-pan = mouse - (mouse - pan) * (new-zoom / zoom)
-        [pan-x pan-y] pan
-        scale-ratio (/ new-zoom zoom)
-        new-pan-x (- mx (* scale-ratio (- mx pan-x)))
-        new-pan-y (- my (* scale-ratio (- my pan-y)))]
-    (swap! *state assoc :zoom new-zoom :pan [new-pan-x new-pan-y])))
+(defn handle-mouse-wheel [mx my rotation]
+  (swap! *state ui/handle-mouse-wheel mx my rotation))
 
 ;; -----------------------------------------------------------------------------
 ;; Canvas Rendering

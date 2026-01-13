@@ -348,3 +348,19 @@
   "Handles mouse up. Returns updated state with dragging/panning cleared."
   [state]
   (assoc state :dragging false :panning false :pan-start nil))
+
+(defn handle-mouse-wheel
+  "Handles mouse wheel zoom centered on mouse position (mx, my).
+   rotation: positive = zoom out, negative = zoom in.
+   Returns updated state."
+  [state mx my rotation]
+  (let [{:keys [zoom pan]} state
+        zoom-factor (if (neg? rotation) 1.1 0.9)
+        new-zoom (max 0.1 (min 10.0 (* zoom zoom-factor)))
+        ;; To zoom centered on mouse position:
+        ;; new-pan = mouse - (mouse - pan) * (new-zoom / zoom)
+        [pan-x pan-y] pan
+        scale-ratio (/ new-zoom zoom)
+        new-pan-x (- mx (* scale-ratio (- mx pan-x)))
+        new-pan-y (- my (* scale-ratio (- my pan-y)))]
+    (assoc state :zoom new-zoom :pan [new-pan-x new-pan-y])))

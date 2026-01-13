@@ -88,22 +88,11 @@
 (defn handle-mouse-up [_e _canvas]
   (swap! app-state ui/handle-mouse-up))
 
-;; TODO - MDM: extract the e and canvas and move the rest to ui
 (defn handle-mouse-wheel [e canvas]
   (let [[mx my] (get-canvas-coords e canvas)
-        {:keys [zoom pan]} @app-state
-        ;; Zoom factor per wheel notch
-        rotation (.-deltaY e)
-        zoom-factor (if (neg? rotation) 1.1 0.9)
-        new-zoom (max 0.1 (min 10.0 (* zoom zoom-factor)))
-        ;; To zoom centered on mouse position:
-        ;; new-pan = mouse - (mouse - pan) * (new-zoom / zoom)
-        [pan-x pan-y] pan
-        scale-ratio (/ new-zoom zoom)
-        new-pan-x (- mx (* scale-ratio (- mx pan-x)))
-        new-pan-y (- my (* scale-ratio (- my pan-y)))]
+        rotation (.-deltaY e)]
     (.preventDefault e)
-    (swap! app-state assoc :zoom new-zoom :pan [new-pan-x new-pan-y])))
+    (swap! app-state ui/handle-mouse-wheel mx my rotation)))
 
 ;; -----------------------------------------------------------------------------
 ;; Angle Display
