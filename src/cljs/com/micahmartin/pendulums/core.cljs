@@ -637,29 +637,35 @@
                        :color "#fafaf9"}} "-"]
      [:span {:style {:color "#c8c8c8" :font-size "12px"}} (str n " pendulums")]]))
 
+(defn trail-slider []
+  (let [{:keys [trail-duration]} @app-state]
+    [:div {:style {:position "absolute"
+                   :top "42px"
+                   :left "50%"
+                   :transform "translateX(-50%)"
+                   :display "flex"
+                   :gap "8px"
+                   :align-items "center"}}
+     [:span {:style {:color "#c8c8c8" :font-size "12px"}} "Trail:"]
+     [:input {:type "range"
+              :min 0
+              :max 100
+              :value (* trail-duration 10)
+              :style {:width "80px"}
+              :on-change #(set-trail-duration! (/ (js/parseInt (-> % .-target .-value)) 10.0))}]
+     [:span {:style {:color "#c8c8c8" :font-size "12px"}} (str (.toFixed trail-duration 1) "s")]]))
+
 (defn controls-component []
-  (let [{:keys [trail-duration system]} @app-state
+  (let [{:keys [system]} @app-state
         energy (engine/total-energy system)]
     [:div.controls
      {:style {:position "absolute"
               :bottom "80px"
               :left "50%"
               :transform "translateX(-50%)"
-              :display "flex"
-              :flex-direction "column"
-              :gap "8px"
               :background-color "rgba(26, 26, 26, 0.8)"
               :padding "10px"
               :border-radius "4px"}}
-     [:div {:style {:display "flex" :gap "8px" :align-items "center"}}
-      [:span {:style {:color "#c8c8c8" :font-size "12px"}} "Trail:"]
-      [:input {:type "range"
-               :min 0
-               :max 100
-               :value (* trail-duration 10)
-               :style {:width "80px"}
-               :on-change #(set-trail-duration! (/ (js/parseInt (-> % .-target .-value)) 10.0))}]
-      [:span {:style {:color "#c8c8c8" :font-size "12px"}} (str (.toFixed trail-duration 1) "s")]]
      [:div {:style {:color "#c8c8c8" :font-size "12px"}}
       (str "Energy: " (.toFixed energy 2) " J")]]))
 
@@ -670,6 +676,7 @@
     [canvas-component]
     [angle-input-component]
     [add-remove-buttons]
+    [trail-slider]
     [center-button]
     [play-pause-button]
     [controls-component]]])
