@@ -4,7 +4,7 @@
   (:import [java.awt Color Graphics2D RenderingHints BasicStroke Dimension BorderLayout Font]
            [java.awt.event MouseAdapter MouseMotionAdapter MouseWheelListener ActionListener]
            [java.awt.geom Ellipse2D$Double Line2D$Double]
-           [javax.swing JFrame JPanel JButton JSlider JLabel Timer SwingUtilities UIManager]
+           [javax.swing JFrame JPanel JButton JSlider JLabel JOptionPane Timer SwingUtilities UIManager]
            [javax.swing.event ChangeListener]))
 
 ;; -----------------------------------------------------------------------------
@@ -198,6 +198,49 @@
         dy (- my py)]
     (Math/atan2 dx dy)))
 
+(defn hit-test-angle-display
+  "Returns the index of the pendulum whose angle row was clicked, or nil."
+  [system mx my]
+  (let [pendulums (:pendulums system)
+        padding 10
+        line-height 20
+        header-y (+ padding line-height)
+        row-width 180]
+    (when (< mx row-width)
+      (some (fn [idx]
+              (let [row-y (+ header-y (* (inc idx) line-height))
+                    top (- row-y 12)
+                    bottom (+ row-y 4)]
+                (when (and (>= my top) (<= my bottom))
+                  idx)))
+            (range (count pendulums))))))
+
+(defn prompt-angle-input!
+  "Shows a dialog to input a new angle for the pendulum at the given index."
+  [idx]
+  (let [{:keys [system]} @*state
+        pendulum (get-in system [:pendulums idx])
+        current-degrees (Math/toDegrees (:theta pendulum))
+        input (JOptionPane/showInputDialog
+                nil
+                (format "Enter angle for pendulum %d (degrees):" (inc idx))
+                "Set Angle"
+                JOptionPane/PLAIN_MESSAGE
+                nil
+                nil
+                (format "%.2f" current-degrees))]
+    (when (and input (not (empty? (str input))))
+      (try
+        (let [new-degrees (Double/parseDouble (str input))
+              new-theta (Math/toRadians new-degrees)]
+          (swap! *state update :system engine/set-pendulum-angle idx new-theta))
+        (catch NumberFormatException _
+          (JOptionPane/showMessageDialog
+            nil
+            "Please enter a valid number."
+            "Invalid Input"
+            JOptionPane/ERROR_MESSAGE))))))
+
 (defn handle-mouse-down [mx my button]
   (let [{:keys [running system zoom pan]} @*state]
     (cond
@@ -205,12 +248,15 @@
       (or (= button 2) (= button 3))
       (swap! *state assoc :panning true :pan-start [mx my])
 
-      ;; Left-click for bob selection (when not running)
+      ;; Left-click on angle display (when not running) - opens input dialog
       (and (= button 1) (not running))
-      (let [hit-idx (hit-test-bob system mx my zoom pan)]
-        (if hit-idx
-          (swap! *state assoc :selected hit-idx :dragging true)
-          (swap! *state assoc :selected nil :dragging false))))))
+      (if-let [angle-idx (hit-test-angle-display system mx my)]
+        (prompt-angle-input! angle-idx)
+        ;; Otherwise check for bob selection
+        (let [hit-idx (hit-test-bob system mx my zoom pan)]
+          (if hit-idx
+            (swap! *state assoc :selected hit-idx :dragging true)
+            (swap! *state assoc :selected nil :dragging false)))))))
 
 (defn handle-mouse-move [mx my]
   (let [{:keys [dragging panning running system selected zoom pan pan-start]} @*state]
