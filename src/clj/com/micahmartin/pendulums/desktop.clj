@@ -646,6 +646,9 @@
         ;; Start animation timer
         (.start timer)
 
+        ;; Start simulation automatically (like web UI)
+        (swap! *state assoc :running true)
+
         ;; Configure and show frame
         (.setDefaultCloseOperation frame JFrame/EXIT_ON_CLOSE)
         (.pack frame)
