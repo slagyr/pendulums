@@ -451,13 +451,13 @@
                     (reset-simulation!)
                     (.setText play-btn "Play")
                     (.repaint canvas))))
-    (.add panel (create-button "+ Pendulum"
-                  (fn []
-                    (add-pendulum!)
-                    (.repaint canvas))))
     (.add panel (create-button "- Pendulum"
                   (fn []
                     (remove-pendulum!)
+                    (.repaint canvas))))
+    (.add panel (create-button "+ Pendulum"
+                  (fn []
+                    (add-pendulum!)
                     (.repaint canvas))))
     (.add panel (create-button "Center"
                   (fn []

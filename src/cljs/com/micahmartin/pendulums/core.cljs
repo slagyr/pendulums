@@ -591,13 +591,6 @@
                    :display "flex"
                    :gap "8px"
                    :align-items "center"}}
-     [:button {:on-click add-pendulum!
-               :style {:padding "4px 8px"
-                       :cursor "pointer"
-                       :background-color "rgba(64, 64, 64, 0.8)"
-                       :border "none"
-                       :border-radius "4px"
-                       :color "#fafaf9"}} "+"]
      [:button {:on-click remove-pendulum!
                :disabled (< n 2)
                :style {:padding "4px 8px"
@@ -606,7 +599,14 @@
                        :border "none"
                        :border-radius "4px"
                        :color "#fafaf9"}} "-"]
-     [:span {:style {:color "#c8c8c8" :font-size "12px"}} (str n " pendulums")]]))
+     [:span {:style {:color "#c8c8c8" :font-size "12px"}} (str n " pendulums")]
+     [:button {:on-click add-pendulum!
+               :style {:padding "4px 8px"
+                       :cursor "pointer"
+                       :background-color "rgba(64, 64, 64, 0.8)"
+                       :border "none"
+                       :border-radius "4px"
+                       :color "#fafaf9"}} "+"]]))
 
 (defn trail-slider []
   (let [{:keys [trail-duration]} @app-state]
