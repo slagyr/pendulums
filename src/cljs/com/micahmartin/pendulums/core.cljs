@@ -594,8 +594,9 @@
         energy (engine/total-energy system)]
     [:div.controls
      {:style {:position "absolute"
-              :bottom "10px"
-              :left "10px"
+              :bottom "80px"
+              :left "50%"
+              :transform "translateX(-50%)"
               :display "flex"
               :flex-direction "column"
               :gap "8px"
