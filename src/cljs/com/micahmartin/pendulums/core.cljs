@@ -2,29 +2,14 @@
   "Web UI entry point using Reagent."
   (:require [reagent.core :as r]
             [reagent.dom :as rdom]
-            [com.micahmartin.pendulums.engine :as engine]))
+            [com.micahmartin.pendulums.engine :as engine]
+            [com.micahmartin.pendulums.ui :as ui]))
 
 ;; -----------------------------------------------------------------------------
-;; Constants
+;; Constants (derived from shared ui.cljc)
 ;; -----------------------------------------------------------------------------
 
-(def default-canvas-width 800)
-(def default-canvas-height 600)
-(def scale 100)  ; pixels per meter
-(def pivot-y-offset 150)  ; pivot is 150px from top
-(def dt 0.016)  ; ~60 fps simulation step
-
-;; Colors for pendulum chain
-(def colors ["#ef4444"   ; red
-             "#3b82f6"   ; blue
-             "#22c55e"   ; green
-             "#f97316"   ; orange
-             "#a855f7"   ; purple
-             "#eab308"   ; yellow
-             "#06b6d4"   ; cyan
-             "#ec4899"   ; pink
-             "#6366f1"   ; indigo
-             "#84cc16"]) ; lime
+(def colors ui/pendulum-colors-css)
 
 ;; -----------------------------------------------------------------------------
 ;; Coordinate Transformations
@@ -33,14 +18,14 @@
 (defn get-pivot
   "Returns [pivot-x pivot-y] based on canvas width."
   [canvas-width]
-  [(/ canvas-width 2) pivot-y-offset])
+  [(/ canvas-width 2) ui/pivot-y-offset])
 
 (defn world->screen
   "Converts world (physics) coordinates to screen coordinates."
   [[wx wy] zoom [pan-x pan-y] canvas-width]
   (let [[pivot-x pivot-y] (get-pivot canvas-width)]
-    [(+ (* (+ pivot-x (* wx scale)) zoom) pan-x)
-     (+ (* (- pivot-y (* wy scale)) zoom) pan-y)]))
+    [(+ (* (+ pivot-x (* wx ui/scale)) zoom) pan-x)
+     (+ (* (- pivot-y (* wy ui/scale)) zoom) pan-y)]))
 
 (defn screen->world
   "Converts screen coordinates to world (physics) coordinates."
@@ -48,8 +33,8 @@
   (let [[pivot-x pivot-y] (get-pivot canvas-width)
         unzoomed-x (/ (- sx pan-x) zoom)
         unzoomed-y (/ (- sy pan-y) zoom)]
-    [(/ (- unzoomed-x pivot-x) scale)
-     (/ (- pivot-y unzoomed-y) scale)]))
+    [(/ (- unzoomed-x pivot-x) ui/scale)
+     (/ (- pivot-y unzoomed-y) ui/scale)]))
 
 (defn pivot-screen-pos
   "Returns the screen position of the main pivot point."
@@ -63,23 +48,14 @@
 ;; -----------------------------------------------------------------------------
 
 (defonce app-state
-  (r/atom {:system (engine/make-system
-                     [(engine/make-pendulum {:theta 0.8 :length 1.0})
-                      (engine/make-pendulum {:theta 0.5 :length 1.0})])
-           :running false
-           :animation-id nil
-           :selected nil      ; index of selected pendulum (nil = none)
-           :dragging false    ; true when dragging to adjust angle
-           :editing-angle nil ; index of pendulum being edited (nil = none)
-           :angle-input ""
-           :trails []         ; Vector of trails, one per pendulum. Each trail is a list of {:pos [x y] :time ms}
-           :trail-duration 3.0
-           :zoom 1.0          ; Viewport zoom level
-           :pan [0.0 0.0]     ; Viewport pan offset [x y]
-           :panning false     ; true when panning viewport
-           :pan-start nil
-           :canvas-width default-canvas-width
-           :canvas-height default-canvas-height}))
+  (r/atom (merge ui/default-state
+                 {:system (engine/make-system
+                            (mapv engine/make-pendulum ui/initial-pendulums))
+                  :animation-id nil
+                  :editing-angle nil
+                  :angle-input ""
+                  :canvas-width ui/default-canvas-width
+                  :canvas-height ui/default-canvas-height})))
 
 ;; -----------------------------------------------------------------------------
 ;; Simulation Control
@@ -89,7 +65,7 @@
   (let [now (.now js/Date)]
     (swap! app-state
            (fn [{:keys [system trail-duration] :as state}]
-             (let [new-system (engine/step system dt)
+             (let [new-system (engine/step system ui/dt)
                    positions (engine/bob-positions new-system)
                    cutoff (- now (* trail-duration 1000))
                    ;; Add new positions to trails and prune old entries
@@ -125,22 +101,14 @@
 (defn reset-simulation! []
   (stop-simulation!)
   (swap! app-state (fn [state]
-                     (assoc state
-                            :system (engine/make-system
-                                      [(engine/make-pendulum {:theta 0.8 :length 1.0})
-                                       (engine/make-pendulum {:theta 0.5 :length 1.0})])
-                            :selected nil
-                            :dragging false
-                            :trails []
-                            :zoom 1.0
-                            :pan [0.0 0.0]
-                            :panning false
-                            :pan-start nil))))
+                     (merge state ui/default-state
+                            {:system (engine/make-system
+                                       (mapv engine/make-pendulum ui/initial-pendulums))}))))
 
 (defn add-pendulum! []
   (swap! app-state (fn [state]
                      (-> state
-                         (update :system engine/add-pendulum (engine/make-pendulum {:theta 0.3 :length 1.0}))
+                         (update :system engine/add-pendulum (engine/make-pendulum ui/new-pendulum-config))
                          (assoc :trails [])))))
 
 (defn remove-pendulum! []
@@ -160,7 +128,7 @@
                      (reduce + 0.0 (map :length pendulums))
                      1.5)
         ;; Convert to pixels at zoom 1.0
-        extent-pixels (* max-extent scale)
+        extent-pixels (* max-extent ui/scale)
         ;; The pendulum can swing in all directions, so fit a circle of radius extent-pixels
         ;; with padding for comfortable viewing
         padding 120.0
@@ -207,7 +175,7 @@
       (keep-indexed
         (fn [idx [bx by]]
           (let [{:keys [mass]} (nth pendulums idx)
-                base-radius (+ 8 (* 4 mass))
+                base-radius (ui/bob-radius mass)
                 radius (* base-radius zoom)
                 dx (- mx bx)
                 dy (- my by)
@@ -412,7 +380,7 @@
           (let [age (- now time)
                 alpha (max 0.0 (- 1.0 (/ age duration-ms)))
                 [sx sy] (world->screen pos zoom pan canvas-width)
-                radius (* 2 zoom)]
+                radius (* ui/trail-dot-radius zoom)]
             (when (> alpha 0.0)
               (set! (.-fillStyle ctx) (str "rgba(" r "," g "," b "," alpha ")"))
               (.beginPath ctx)
@@ -440,8 +408,8 @@
               color (nth colors (mod idx (count colors)))]
 
           ;; Draw arm
-          (set! (.-strokeStyle ctx) "#525252")
-          (set! (.-lineWidth ctx) (* 3 zoom))
+          (set! (.-strokeStyle ctx) ui/arm-color-css)
+          (set! (.-lineWidth ctx) (* ui/arm-stroke-width zoom))
           (.beginPath ctx)
           (.moveTo ctx prev-x prev-y)
           (.lineTo ctx screen-x screen-y)
@@ -449,7 +417,7 @@
 
           ;; Draw bob
           (let [{:keys [mass]} (nth pendulums idx)
-                base-radius (+ 8 (* 4 mass))
+                base-radius (ui/bob-radius mass)
                 radius (* base-radius zoom)]
             (set! (.-fillStyle ctx) color)
             (.beginPath ctx)
@@ -457,15 +425,15 @@
             (.fill ctx)
 
             ;; Bob outline
-            (set! (.-strokeStyle ctx) "#ffffff")
-            (set! (.-lineWidth ctx) (* 2 zoom))
+            (set! (.-strokeStyle ctx) ui/bob-outline-color-css)
+            (set! (.-lineWidth ctx) (* ui/bob-outline-width zoom))
             (.stroke ctx))
 
           (recur screen-x screen-y (inc idx) (rest bobs)))))
 
     ;; Draw pivot point
-    (let [pivot-radius (* 6 zoom)]
-      (set! (.-fillStyle ctx) "#737373")
+    (let [pivot-radius (* ui/pivot-radius zoom)]
+      (set! (.-fillStyle ctx) ui/pivot-color-css)
       (.beginPath ctx)
       (.arc ctx piv-sx piv-sy pivot-radius 0 (* 2 js/Math.PI))
       (.fill ctx))
