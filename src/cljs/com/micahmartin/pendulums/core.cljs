@@ -304,9 +304,11 @@
             (range (count pendulums))))))
 
 (defn normalize-angle
-  "Converts physics theta to display angle where 0°=up, 180°=down, normalized to 0-360."
+  "Converts physics theta to display angle where 0°=up, 90°=right, 180°=down, 270°=left.
+   Like a compass heading where angles increase clockwise."
   [theta]
-  (let [degrees (* theta (/ 180 js/Math.PI))
+  (let [;; Negate theta because physics convention is counter-clockwise, compass is clockwise
+        degrees (* (- theta) (/ 180 js/Math.PI))
         ;; Add 180 so that theta=0 (down) becomes 180°, theta=π (up) becomes 0°
         shifted (+ degrees 180)
         ;; Normalize to 0-360 range
@@ -317,7 +319,7 @@
 
 (defn draw-angle-display
   "Draws a tabular display of pendulum angles in the top left of the canvas."
-  [ctx system]
+  [ctx system editing-angle]
   (let [pendulums (:pendulums system)
         header-y (+ angle-display-padding angle-display-line-height)]
     (set! (.-font ctx) "14px monospace")
@@ -329,21 +331,27 @@
       (let [y (+ header-y (* (inc idx) angle-display-line-height))
             color (nth colors (mod idx (count colors)))
             display-angle (normalize-angle theta)
-            angle-str (str (.toFixed display-angle 2) "°")]
+            angle-str (str (.toFixed display-angle 2) "°")
+            is-editing (= idx editing-angle)]
         ;; Draw color indicator box
         (set! (.-fillStyle ctx) color)
         (.fillRect ctx angle-display-padding (- y 10) 12 12)
         (set! (.-strokeStyle ctx) "#ffffff")
         (set! (.-lineWidth ctx) 1)
         (.strokeRect ctx angle-display-padding (- y 10) 12 12)
-        ;; Draw label and angle
+        ;; Draw label (and angle if not editing)
         (set! (.-fillStyle ctx) "#c8c8c8")
-        (.fillText ctx (str "    " (inc idx) "      " angle-str) (+ angle-display-padding 12) y)))))
+        (if is-editing
+          ;; When editing, only draw the label portion (no angle)
+          (.fillText ctx (str "    " (inc idx)) (+ angle-display-padding 12) y)
+          ;; Normal: draw label and angle
+          (.fillText ctx (str "    " (inc idx) "      " angle-str) (+ angle-display-padding 12) y))))))
 
 (defn display-angle->theta
-  "Converts display angle (0°=up, 180°=down) back to physics theta."
+  "Converts display angle (0°=up, 90°=right, 180°=down, 270°=left) back to physics theta."
   [display-angle]
-  (* (- display-angle 180) (/ js/Math.PI 180)))
+  ;; Reverse of normalize-angle: negate to convert from clockwise to counter-clockwise
+  (* (- 180 display-angle) (/ js/Math.PI 180)))
 
 (defn start-angle-edit!
   "Opens the inline angle editor for the pendulum at idx."
@@ -399,7 +407,7 @@
               (.arc ctx sx sy radius 0 (* 2 js/Math.PI))
               (.fill ctx))))))))
 
-(defn draw-pendulum-system [ctx system selected running trails trail-duration zoom pan canvas-width canvas-height]
+(defn draw-pendulum-system [ctx system selected running trails trail-duration zoom pan canvas-width canvas-height editing-angle]
   (let [positions (engine/bob-positions system)
         pendulums (:pendulums system)
         [piv-sx piv-sy] (pivot-screen-pos zoom pan canvas-width)]
@@ -457,7 +465,7 @@
       (.fill ctx))
 
     ;; Draw angle display (not affected by zoom/pan)
-    (draw-angle-display ctx system)))
+    (draw-angle-display ctx system editing-angle)))
 
 ;; -----------------------------------------------------------------------------
 ;; Reagent Components
@@ -491,11 +499,11 @@
          (when-let [canvas @canvas-ref]
            (let [ctx (.getContext canvas "2d")]
              (add-watch app-state :render
-                        (fn [_ _ _ {:keys [system selected running trails trail-duration zoom pan canvas-width canvas-height]}]
-                          (draw-pendulum-system ctx system selected running trails trail-duration zoom pan canvas-width canvas-height)))
+                        (fn [_ _ _ {:keys [system selected running trails trail-duration zoom pan canvas-width canvas-height editing-angle]}]
+                          (draw-pendulum-system ctx system selected running trails trail-duration zoom pan canvas-width canvas-height editing-angle)))
              ;; Initial draw
-             (let [{:keys [system selected running trails trail-duration zoom pan canvas-width canvas-height]} @app-state]
-               (draw-pendulum-system ctx system selected running trails trail-duration zoom pan canvas-width canvas-height)))))
+             (let [{:keys [system selected running trails trail-duration zoom pan canvas-width canvas-height editing-angle]} @app-state]
+               (draw-pendulum-system ctx system selected running trails trail-duration zoom pan canvas-width canvas-height editing-angle)))))
 
        :component-will-unmount
        (fn [_]
@@ -527,7 +535,10 @@
       (let [header-y (+ angle-display-padding angle-display-line-height)
             row-y (+ header-y (* (inc editing-angle) angle-display-line-height))
             input-top (- row-y 14)
-            input-left (+ angle-display-padding 50)]
+            ;; Position input where the angle text appears (after "    N      " = ~11 chars from text start)
+            ;; Text starts at x = angle-display-padding + 12 = 22
+            ;; At 14px monospace (~8.4px/char), 11 chars = ~92px, so angle starts at ~114px
+            input-left 115]
         [:div.angle-input-overlay
          {:style {:position "absolute"
                   :top (str input-top "px")
@@ -535,10 +546,14 @@
          [:input {:type "text"
                   :value angle-input
                   :auto-focus true
-                  :style {:width "80px"
+                  :style {:width "60px"
                           :padding "2px 4px"
                           :font-family "monospace"
-                          :font-size "14px"}
+                          :font-size "14px"
+                          :background-color "#121212"
+                          :color "#c8c8c8"
+                          :border "1px solid #404040"
+                          :border-radius "2px"}
                   :on-change #(swap! app-state assoc :angle-input (-> % .-target .-value))
                   :on-key-down (fn [e]
                                  (case (.-key e)
@@ -546,7 +561,7 @@
                                    "Escape" (cancel-angle-edit!)
                                    nil))
                   :on-blur cancel-angle-edit!}]
-         [:span {:style {:margin-left "4px" :color "#c8c8c8"}} "°"]]))))
+         [:span {:style {:margin-left "2px" :color "#c8c8c8" :font-family "monospace" :font-size "14px"}} "°"]]))))
 
 (defn set-trail-duration! [duration]
   (swap! app-state assoc :trail-duration duration))
