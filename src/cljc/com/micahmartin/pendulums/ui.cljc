@@ -236,3 +236,39 @@
   (-> state
       (update :system engine/add-pendulum (engine/make-pendulum new-pendulum-config))
       (assoc :trails [])))
+
+(defn remove-pendulum
+  "Removes the last pendulum from the system. Clears trails."
+  [state]
+  (-> state
+      (update :system engine/remove-pendulum)
+      (assoc :trails [])))
+
+(defn center-view
+  "Calculates zoom and pan to fit all pendulums centered in the viewport.
+   Returns updated state with new :zoom and :pan values."
+  [state]
+  (let [{:keys [system canvas-width canvas-height]} state
+        [pivot-x pivot-y] (get-pivot canvas-width)
+        pendulums (:pendulums system)
+        ;; Calculate max extent (sum of all pendulum lengths)
+        max-extent (if (seq pendulums)
+                     (reduce + 0.0 (map :length pendulums))
+                     1.5)
+        ;; Convert to pixels at zoom 1.0
+        extent-pixels (* max-extent scale)
+        ;; The pendulum can swing in all directions, so fit a circle of radius extent-pixels
+        ;; with padding for comfortable viewing
+        padding 120.0
+        required-size (+ (* 2.0 extent-pixels) padding)
+        ;; Calculate zoom to fit in the smaller dimension
+        zoom-for-width (/ canvas-width required-size)
+        zoom-for-height (/ canvas-height required-size)
+        fit-zoom (max 0.2 (min 1.5 (min zoom-for-width zoom-for-height)))
+        ;; Center the pendulum system in the viewport
+        ;; The system extends from pivot-y down to pivot-y + extent-pixels
+        ;; Center on the midpoint: pivot-y + extent-pixels/2
+        system-center-y (+ pivot-y (/ extent-pixels 2.0))
+        pan-x (- (/ canvas-width 2.0) (* pivot-x fit-zoom))
+        pan-y (- (/ canvas-height 2.0) (* system-center-y fit-zoom))]
+    (assoc state :zoom fit-zoom :pan [pan-x pan-y])))
