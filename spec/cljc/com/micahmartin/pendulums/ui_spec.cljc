@@ -1,6 +1,8 @@
 (ns com.micahmartin.pendulums.ui-spec
   (:require #?(:clj [speclj.core :refer :all]
-               :cljs [speclj.core :refer-macros [describe it should should= should-not-be-nil]])
+               :cljs [speclj.core :refer-macros [describe it should should= should-be-nil should-not-be-nil]])
+            [com.micahmartin.pendulums.engine :as engine]
+            [com.micahmartin.pendulums.math :as math]
             [com.micahmartin.pendulums.ui :as ui]))
 
 (describe "UI Shared Code"
@@ -163,4 +165,102 @@
       (it "applies both zoom and pan"
         ;; pivot-x=400, pivot-y=150, zoom=2, pan=[10, 20]
         ;; result = [400*2 + 10, 150*2 + 20] = [810, 320]
-        (should= [810.0 320.0] (ui/pivot-screen-pos 2.0 [10.0 20.0] 800))))))
+        (should= [810.0 320.0] (ui/pivot-screen-pos 2.0 [10.0 20.0] 800)))))
+
+  (describe "bob position & hit testing"
+
+    (describe "bob-screen-positions"
+      (it "returns screen positions for a single pendulum"
+        (let [system (engine/make-system [(engine/make-pendulum {:theta 0 :length 1.0})])
+              positions (ui/bob-screen-positions system 1.0 [0.0 0.0] 800)]
+          ;; Bob at (0, -1) in world coords (hanging down)
+          ;; Screen: pivot-x=400, pivot-y=150, scale=100
+          ;; screen-x = 400 + 0*100 = 400
+          ;; screen-y = 150 - (-1)*100 = 250
+          (should= 1 (count positions))
+          (should= 400.0 (first (first positions)))
+          (should= 250.0 (second (first positions)))))
+
+      (it "returns positions for multiple pendulums"
+        (let [system (engine/make-system [(engine/make-pendulum {:theta 0 :length 1.0})
+                                          (engine/make-pendulum {:theta 0 :length 1.0})])
+              positions (ui/bob-screen-positions system 1.0 [0.0 0.0] 800)]
+          (should= 2 (count positions)))))
+
+    (describe "pivot-for-pendulum"
+      (it "returns main pivot for first pendulum"
+        (let [system (engine/make-system [(engine/make-pendulum {:theta 0 :length 1.0})])
+              pivot (ui/pivot-for-pendulum system 0 1.0 [0.0 0.0] 800)]
+          (should= [400.0 150.0] pivot)))
+
+      (it "returns previous bob position for subsequent pendulums"
+        (let [system (engine/make-system [(engine/make-pendulum {:theta 0 :length 1.0})
+                                          (engine/make-pendulum {:theta 0 :length 1.0})])
+              pivot (ui/pivot-for-pendulum system 1 1.0 [0.0 0.0] 800)]
+          ;; Should be the screen position of the first bob
+          (should= 400.0 (first pivot))
+          (should= 250.0 (second pivot)))))
+
+    (describe "hit-test-bob"
+      (it "returns nil when click is far from any bob"
+        (let [system (engine/make-system [(engine/make-pendulum {:theta 0 :length 1.0})])]
+          (should-be-nil (ui/hit-test-bob system 0 0 1.0 [0.0 0.0] 800))))
+
+      (it "returns bob index when click is on bob"
+        (let [system (engine/make-system [(engine/make-pendulum {:theta 0 :length 1.0})])]
+          ;; Bob is at screen position (400, 250)
+          (should= 0 (ui/hit-test-bob system 400 250 1.0 [0.0 0.0] 800))))
+
+      (it "returns correct index for second bob"
+        (let [system (engine/make-system [(engine/make-pendulum {:theta 0 :length 1.0})
+                                          (engine/make-pendulum {:theta 0 :length 1.0})])]
+          ;; Second bob is at screen position (400, 350)
+          (should= 1 (ui/hit-test-bob system 400 350 1.0 [0.0 0.0] 800))))))
+
+  (describe "angle calculations"
+
+    (describe "angle-from-pivot"
+      (it "returns 0 for point directly below pivot"
+        (should= 0.0 (ui/angle-from-pivot [100 100] [100 200])))
+
+      (it "returns positive angle for point to the right"
+        (let [angle (ui/angle-from-pivot [100 100] [200 100])]
+          ;; Point is to the right, should be ~π/2 (90 degrees clockwise)
+          (should (> angle 1.5))
+          (should (< angle 1.6))))
+
+      (it "returns negative angle for point to the left"
+        (let [angle (ui/angle-from-pivot [100 100] [0 100])]
+          ;; Point is to the left, should be ~-π/2 (-90 degrees)
+          (should (< angle -1.5))
+          (should (> angle -1.6)))))
+
+    (describe "normalize-angle"
+      (it "converts theta=0 (hanging down) to 180 degrees"
+        (should= 180.0 (ui/normalize-angle 0)))
+
+      (it "converts theta=π (up) to 0 degrees"
+        (let [result (ui/normalize-angle math/PI)]
+          (should (< (math/abs result) 0.001))))
+
+      (it "converts theta=π/2 (right, clockwise from down) to 90 degrees"
+        (let [result (ui/normalize-angle (/ math/PI 2))]
+          (should (< (math/abs (- result 90)) 0.001))))
+
+      (it "converts theta=-π/2 (left, counter-clockwise from down) to 270 degrees"
+        (let [result (ui/normalize-angle (/ math/PI -2))]
+          (should (< (math/abs (- result 270)) 0.001)))))
+
+    (describe "display-angle->theta"
+      (it "converts 180 degrees back to theta=0"
+        (should= 0.0 (ui/display-angle->theta 180)))
+
+      (it "converts 0 degrees back to theta=π"
+        (let [result (ui/display-angle->theta 0)]
+          (should (< (math/abs (- result math/PI)) 0.001))))
+
+      (it "is inverse of normalize-angle"
+        (let [original-theta 0.5
+              display (ui/normalize-angle original-theta)
+              back-to-theta (ui/display-angle->theta display)]
+          (should (< (math/abs (- original-theta back-to-theta)) 0.001)))))))

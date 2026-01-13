@@ -1,4 +1,6 @@
-(ns com.micahmartin.pendulums.ui)
+(ns com.micahmartin.pendulums.ui
+  (:require [com.micahmartin.pendulums.math :as math]
+            [com.micahmartin.pendulums.engine :as engine]))
 
 ;; -----------------------------------------------------------------------------
 ;; Simulation Constants
@@ -143,3 +145,73 @@
   (let [[pivot-x pivot-y] (get-pivot canvas-width)]
     [(+ (* pivot-x zoom) pan-x)
      (+ (* pivot-y zoom) pan-y)]))
+
+;; -----------------------------------------------------------------------------
+;; Bob Position & Hit Testing
+;; -----------------------------------------------------------------------------
+
+(defn bob-screen-positions
+  "Returns screen coordinates of all bobs."
+  [system zoom pan canvas-width]
+  (mapv (fn [[x y]]
+          (world->screen [x y] zoom pan canvas-width))
+        (engine/bob-positions system)))
+
+(defn pivot-for-pendulum
+  "Returns the pivot point (screen coords) for pendulum at idx.
+   For idx 0, it's the main pivot. For idx > 0, it's the previous bob."
+  [system idx zoom pan canvas-width]
+  (if (zero? idx)
+    (pivot-screen-pos zoom pan canvas-width)
+    (let [positions (bob-screen-positions system zoom pan canvas-width)]
+      (nth positions (dec idx)))))
+
+(defn hit-test-bob
+  "Returns index of bob at (mx, my) or nil if none hit."
+  [system mx my zoom pan canvas-width]
+  (let [positions (bob-screen-positions system zoom pan canvas-width)
+        pendulums (:pendulums system)]
+    (first
+      (keep-indexed
+        (fn [idx [bx by]]
+          (let [{:keys [mass]} (nth pendulums idx)
+                base-radius (bob-radius mass)
+                radius (* base-radius zoom)
+                dx (- mx bx)
+                dy (- my by)
+                dist (math/sqrt (+ (* dx dx) (* dy dy)))]
+            (when (<= dist (+ radius 5))  ; 5px extra for easier clicking
+              idx)))
+        positions))))
+
+;; -----------------------------------------------------------------------------
+;; Angle Calculations
+;; -----------------------------------------------------------------------------
+
+(defn angle-from-pivot
+  "Calculates the angle from pivot to mouse position.
+   Returns angle in radians where 0 = hanging down, positive = clockwise."
+  [[px py] [mx my]]
+  (let [dx (- mx px)
+        dy (- my py)]  ; positive dy = below pivot (in screen coords)
+    (math/atan2 dx dy)))
+
+(defn normalize-angle
+  "Converts physics theta to display angle where 0°=up, 90°=right, 180°=down, 270°=left.
+   Like a compass heading where angles increase clockwise."
+  [theta]
+  (let [;; Negate theta because physics convention is counter-clockwise, compass is clockwise
+        degrees (* (- theta) (/ 180 math/PI))
+        ;; Add 180 so that theta=0 (down) becomes 180°, theta=π (up) becomes 0°
+        shifted (+ degrees 180)
+        ;; Normalize to 0-360 range
+        normalized (mod shifted 360)]
+    (if (neg? normalized)
+      (+ normalized 360)
+      normalized)))
+
+(defn display-angle->theta
+  "Converts display angle (0°=up, 90°=right, 180°=down, 270°=left) back to physics theta."
+  [display-angle]
+  ;; Reverse of normalize-angle: negate to convert from clockwise to counter-clockwise
+  (* (- 180 display-angle) (/ math/PI 180)))

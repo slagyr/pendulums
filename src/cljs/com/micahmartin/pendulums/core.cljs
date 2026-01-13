@@ -134,58 +134,13 @@
     [(- (.-clientX e) (.-left rect))
      (- (.-clientY e) (.-top rect))]))
 
-;; TODO - MDM: move to ui
-(defn bob-screen-positions
-  "Returns screen coordinates of all bobs."
-  [system zoom pan canvas-width]
-  (mapv (fn [[x y]]
-          (ui/world->screen [x y] zoom pan canvas-width))
-        (engine/bob-positions system)))
-
-;; TODO - MDM: move to ui
-(defn hit-test-bob
-  "Returns index of bob at (mx, my) or nil if none hit."
-  [system mx my zoom pan canvas-width]
-  (let [positions (bob-screen-positions system zoom pan canvas-width)
-        pendulums (:pendulums system)]
-    (first
-      (keep-indexed
-        (fn [idx [bx by]]
-          (let [{:keys [mass]} (nth pendulums idx)
-                base-radius (ui/bob-radius mass)
-                radius (* base-radius zoom)
-                dx (- mx bx)
-                dy (- my by)
-                dist (js/Math.sqrt (+ (* dx dx) (* dy dy)))]
-            (when (<= dist (+ radius 5))  ; 5px extra for easier clicking
-              idx)))
-        positions))))
-
-;; TODO - MDM: move to ui
-(defn pivot-for-pendulum
-  "Returns the pivot point (screen coords) for pendulum at idx.
-   For idx 0, it's the main pivot. For idx > 0, it's the previous bob."
-  [system idx zoom pan canvas-width]
-  (if (zero? idx)
-    (ui/pivot-screen-pos zoom pan canvas-width)
-    (let [positions (bob-screen-positions system zoom pan canvas-width)]
-      (nth positions (dec idx)))))
-
-;; TODO - MDM: move to ui
-(defn angle-from-pivot
-  "Calculates the angle from pivot to mouse position.
-   Returns angle in radians where 0 = hanging down, positive = clockwise."
-  [[px py] [mx my]]
-  (let [dx (- mx px)
-        dy (- my py)]  ; positive dy = below pivot (in screen coords)
-    (js/Math.atan2 dx dy)))
 
 ;; TODO - MDM: If we pass in coordinates instead of e and canvas, the fn can be moved to ui
 (defn handle-mouse-down [e canvas]
   (let [[mx my] (get-canvas-coords e canvas)
         {:keys [running system zoom pan canvas-width]} @app-state
         angle-hit (hit-test-angle-display system mx my)
-        hit-idx (hit-test-bob system mx my zoom pan canvas-width)]
+        hit-idx (ui/hit-test-bob system mx my zoom pan canvas-width)]
     (cond
       ;; Check for angle display click first (when not running)
       (and (not running) angle-hit)
@@ -216,8 +171,8 @@
 
       ;; Handle bob dragging (when not running)
       (and dragging (not running))
-      (let [pivot (pivot-for-pendulum system selected zoom pan canvas-width)
-            new-theta (angle-from-pivot pivot [mx my])]
+      (let [pivot (ui/pivot-for-pendulum system selected zoom pan canvas-width)
+            new-theta (ui/angle-from-pivot pivot [mx my])]
         (swap! app-state update :system engine/set-pendulum-angle selected new-theta)))))
 
 ;; TODO - MDM: move to ui without params
@@ -263,20 +218,6 @@
                   idx)))
             (range (count pendulums))))))
 
-;; TODO - MDM: Move to ui
-(defn normalize-angle
-  "Converts physics theta to display angle where 0°=up, 90°=right, 180°=down, 270°=left.
-   Like a compass heading where angles increase clockwise."
-  [theta]
-  (let [;; Negate theta because physics convention is counter-clockwise, compass is clockwise
-        degrees (* (- theta) (/ 180 js/Math.PI))
-        ;; Add 180 so that theta=0 (down) becomes 180°, theta=π (up) becomes 0°
-        shifted (+ degrees 180)
-        ;; Normalize to 0-360 range
-        normalized (mod shifted 360)]
-    (if (neg? normalized)
-      (+ normalized 360)
-      normalized)))
 
 (defn draw-angle-display
   "Draws a tabular display of pendulum angles in the top left of the canvas."
@@ -295,7 +236,7 @@
     (doseq [[idx {:keys [theta]}] (map-indexed vector pendulums)]
       (let [y (+ header-y (* (inc idx) angle-display-line-height))
             color (nth colors (mod idx (count colors)))
-            display-angle (normalize-angle theta)
+            display-angle (ui/normalize-angle theta)
             angle-str (str (.toFixed display-angle 2) "°")
             is-editing (= idx editing-angle)]
         ;; Draw color indicator box
@@ -311,12 +252,6 @@
         (when-not is-editing
           (.fillText ctx angle-str angle-x y))))))
 
-;; TODO - MDM: move to ui
-(defn display-angle->theta
-  "Converts display angle (0°=up, 90°=right, 180°=down, 270°=left) back to physics theta."
-  [display-angle]
-  ;; Reverse of normalize-angle: negate to convert from clockwise to counter-clockwise
-  (* (- 180 display-angle) (/ js/Math.PI 180)))
 
 ;; TODO - MDM: move to ui
 (defn start-angle-edit!
@@ -324,7 +259,7 @@
   [idx]
   (let [{:keys [system]} @app-state
         pendulum (get-in system [:pendulums idx])
-        display-angle (normalize-angle (:theta pendulum))]
+        display-angle (ui/normalize-angle (:theta pendulum))]
     (swap! app-state assoc
            :editing-angle idx
            :angle-input (.toFixed display-angle 2))))
@@ -339,7 +274,7 @@
     (when editing-angle
       (when-let [display-angle (js/parseFloat angle-input)]
         (when-not (js/isNaN display-angle)
-          (let [new-theta (display-angle->theta display-angle)]
+          (let [new-theta (ui/display-angle->theta display-angle)]
             (swap! app-state update :system engine/set-pendulum-angle editing-angle new-theta)))))
     (cancel-angle-edit!)))
 
