@@ -610,9 +610,35 @@
                     :justify-content "center"}}
    "◎"])
 
+(defn add-remove-buttons []
+  (let [{:keys [system]} @app-state
+        n (engine/pendulum-count system)]
+    [:div {:style {:position "absolute"
+                   :top "10px"
+                   :left "50%"
+                   :transform "translateX(-50%)"
+                   :display "flex"
+                   :gap "8px"
+                   :align-items "center"}}
+     [:button {:on-click add-pendulum!
+               :style {:padding "4px 8px"
+                       :cursor "pointer"
+                       :background-color "rgba(64, 64, 64, 0.8)"
+                       :border "none"
+                       :border-radius "4px"
+                       :color "#fafaf9"}} "+"]
+     [:button {:on-click remove-pendulum!
+               :disabled (< n 2)
+               :style {:padding "4px 8px"
+                       :cursor "pointer"
+                       :background-color "rgba(64, 64, 64, 0.8)"
+                       :border "none"
+                       :border-radius "4px"
+                       :color "#fafaf9"}} "-"]
+     [:span {:style {:color "#c8c8c8" :font-size "12px"}} (str n " pendulums")]]))
+
 (defn controls-component []
-  (let [{:keys [system trail-duration]} @app-state
-        n (engine/pendulum-count system)
+  (let [{:keys [trail-duration system]} @app-state
         energy (engine/total-energy system)]
     [:div.controls
      {:style {:position "absolute"
@@ -625,13 +651,6 @@
               :background-color "rgba(26, 26, 26, 0.8)"
               :padding "10px"
               :border-radius "4px"}}
-     [:div {:style {:display "flex" :gap "8px" :align-items "center"}}
-      [:button {:on-click add-pendulum!
-                :style {:padding "4px 8px" :cursor "pointer"}} "+"]
-      [:button {:on-click remove-pendulum!
-                :disabled (< n 2)
-                :style {:padding "4px 8px" :cursor "pointer"}} "-"]
-      [:span {:style {:color "#c8c8c8" :font-size "12px"}} (str n " pendulums")]]
      [:div {:style {:display "flex" :gap "8px" :align-items "center"}}
       [:span {:style {:color "#c8c8c8" :font-size "12px"}} "Trail:"]
       [:input {:type "range"
@@ -650,6 +669,7 @@
     {:style {:position "relative"}}
     [canvas-component]
     [angle-input-component]
+    [add-remove-buttons]
     [center-button]
     [play-pause-button]
     [controls-component]]])
