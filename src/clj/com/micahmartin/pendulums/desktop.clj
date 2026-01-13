@@ -1,4 +1,4 @@
-(ns com.micahmartin.pendulums.swing
+(ns com.micahmartin.pendulums.desktop
   "Desktop GUI using Swing for coupled pendulum simulation."
   (:require [com.micahmartin.pendulums.engine :as engine])
   (:import [java.awt Color Graphics2D RenderingHints BasicStroke Dimension BorderLayout Font]

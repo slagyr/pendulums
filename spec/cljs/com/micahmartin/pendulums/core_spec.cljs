@@ -15,7 +15,7 @@
 
 (describe "Core"
 
-  (it "something"
-    (should= 1 2))
+  ;(it "something"
+  ;  (should= 1 2))
 
   )
