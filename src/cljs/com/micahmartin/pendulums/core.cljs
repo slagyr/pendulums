@@ -419,7 +419,7 @@
               (.arc ctx sx sy radius 0 (* 2 js/Math.PI))
               (.fill ctx))))))))
 
-(defn draw-pendulum-system [ctx system selected running trails trail-duration zoom pan canvas-width canvas-height editing-angle]
+(defn draw-pendulum-system [ctx system running trails trail-duration zoom pan canvas-width canvas-height editing-angle]
   (let [positions (engine/bob-positions system)
         pendulums (:pendulums system)
         [piv-sx piv-sy] (pivot-screen-pos zoom pan canvas-width)]
@@ -437,8 +437,7 @@
       (when (seq bobs)
         (let [[x y] (first bobs)
               [screen-x screen-y] (world->screen [x y] zoom pan canvas-width)
-              color (nth colors (mod idx (count colors)))
-              is-selected (and (not running) (= idx selected))]
+              color (nth colors (mod idx (count colors)))]
 
           ;; Draw arm
           (set! (.-strokeStyle ctx) "#525252")
@@ -457,14 +456,9 @@
             (.arc ctx screen-x screen-y radius 0 (* 2 js/Math.PI))
             (.fill ctx)
 
-            ;; Bob outline (highlight if selected)
-            (if is-selected
-              (do
-                (set! (.-strokeStyle ctx) "#ffcc00")
-                (set! (.-lineWidth ctx) (* 4 zoom)))
-              (do
-                (set! (.-strokeStyle ctx) "#ffffff")
-                (set! (.-lineWidth ctx) (* 2 zoom))))
+            ;; Bob outline
+            (set! (.-strokeStyle ctx) "#ffffff")
+            (set! (.-lineWidth ctx) (* 2 zoom))
             (.stroke ctx))
 
           (recur screen-x screen-y (inc idx) (rest bobs)))))
@@ -511,11 +505,11 @@
          (when-let [canvas @canvas-ref]
            (let [ctx (.getContext canvas "2d")]
              (add-watch app-state :render
-                        (fn [_ _ _ {:keys [system selected running trails trail-duration zoom pan canvas-width canvas-height editing-angle]}]
-                          (draw-pendulum-system ctx system selected running trails trail-duration zoom pan canvas-width canvas-height editing-angle)))
+                        (fn [_ _ _ {:keys [system running trails trail-duration zoom pan canvas-width canvas-height editing-angle]}]
+                          (draw-pendulum-system ctx system running trails trail-duration zoom pan canvas-width canvas-height editing-angle)))
              ;; Initial draw
-             (let [{:keys [system selected running trails trail-duration zoom pan canvas-width canvas-height editing-angle]} @app-state]
-               (draw-pendulum-system ctx system selected running trails trail-duration zoom pan canvas-width canvas-height editing-angle)))))
+             (let [{:keys [system running trails trail-duration zoom pan canvas-width canvas-height editing-angle]} @app-state]
+               (draw-pendulum-system ctx system running trails trail-duration zoom pan canvas-width canvas-height editing-angle)))))
 
        :component-will-unmount
        (fn [_]

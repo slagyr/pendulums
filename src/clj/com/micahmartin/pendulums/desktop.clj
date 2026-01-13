@@ -26,7 +26,6 @@
              (Color. 0x22 0xc5 0x5e)])
 (def arm-color (Color. 0x52 0x52 0x52))
 (def bob-outline-color Color/WHITE)
-(def selected-outline-color (Color. 0xf5 0x9e 0x0b))
 (def pivot-color (Color. 0x73 0x73 0x73))
 (def bg-color (Color. 0x12 0x12 0x12))
 (def btn-bg-color (Color. 0x40 0x40 0x40))
@@ -323,7 +322,7 @@
               (.fill g (Ellipse2D$Double. (- sx radius) (- sy radius)
                                           (* 2 radius) (* 2 radius))))))))))
 
-(defn draw-pendulum-system [^Graphics2D g system selected running zoom pan]
+(defn draw-pendulum-system [^Graphics2D g system running zoom pan]
   (let [positions (engine/bob-positions system)
         pendulums (:pendulums system)
         [piv-sx piv-sy] (pivot-screen-pos zoom pan)]
@@ -340,7 +339,6 @@
         (let [[x y] (first bobs)
               [screen-x screen-y] (world->screen [x y] zoom pan)
               color (nth colors (mod idx (count colors)))
-              is-selected (and (not running) (= idx selected))
               {:keys [mass]} (nth pendulums idx)
               base-radius (+ 8.0 (* 4.0 mass))
               radius (* base-radius zoom)]
@@ -356,11 +354,8 @@
                                       (* 2 radius) (* 2 radius)))
 
           ;; Draw outline
-          (if is-selected
-            (do (.setColor g selected-outline-color)
-                (.setStroke g (BasicStroke. (float (* 4.0 zoom)))))
-            (do (.setColor g bob-outline-color)
-                (.setStroke g (BasicStroke. (float (* 2.0 zoom))))))
+          (.setColor g bob-outline-color)
+          (.setStroke g (BasicStroke. (float (* 2.0 zoom))))
           (.draw g (Ellipse2D$Double. (- screen-x radius) (- screen-y radius)
                                       (* 2 radius) (* 2 radius)))
 
@@ -423,11 +418,11 @@
   (let [panel (proxy [JPanel] []
                 (paintComponent [^Graphics2D g]
                   (proxy-super paintComponent g)
-                  (let [{:keys [system selected running zoom pan trails trail-duration]} @*state]
+                  (let [{:keys [system running zoom pan trails trail-duration]} @*state]
                     (.setColor g bg-color)
                     (.fillRect g 0 0 canvas-width canvas-height)
                     (draw-trails g trails trail-duration zoom pan)
-                    (draw-pendulum-system g system selected running zoom pan)
+                    (draw-pendulum-system g system running zoom pan)
                     (draw-angle-display g system))))]
     (.setPreferredSize panel (Dimension. canvas-width canvas-height))
     (.setBackground panel bg-color)
