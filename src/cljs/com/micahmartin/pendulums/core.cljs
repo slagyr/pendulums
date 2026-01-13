@@ -503,7 +503,9 @@
              ;; Set canvas size directly on DOM and draw immediately
              (update-canvas-size! container-ref canvas-ref)
              (let [{:keys [system running trails trail-duration zoom pan canvas-width canvas-height editing-angle]} @app-state]
-               (draw-pendulum-system ctx system running trails trail-duration zoom pan canvas-width canvas-height editing-angle)))))
+               (draw-pendulum-system ctx system running trails trail-duration zoom pan canvas-width canvas-height editing-angle))
+             ;; Start simulation automatically
+             (start-simulation!))))
 
        :component-will-unmount
        (fn [_]
