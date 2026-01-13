@@ -64,8 +64,8 @@
 
 (defonce app-state
   (r/atom {:system (engine/make-system
-                     [(engine/make-pendulum {:theta 0.8 :length 1.5})
-                      (engine/make-pendulum {:theta 0.5 :length 1.2})])
+                     [(engine/make-pendulum {:theta 0.8 :length 1.0})
+                      (engine/make-pendulum {:theta 0.5 :length 1.0})])
            :running false
            :animation-id nil
            :selected nil      ; index of selected pendulum (nil = none)
@@ -127,8 +127,8 @@
   (swap! app-state (fn [state]
                      (assoc state
                             :system (engine/make-system
-                                      [(engine/make-pendulum {:theta 0.8 :length 1.5})
-                                       (engine/make-pendulum {:theta 0.5 :length 1.2})])
+                                      [(engine/make-pendulum {:theta 0.8 :length 1.0})
+                                       (engine/make-pendulum {:theta 0.5 :length 1.0})])
                             :selected nil
                             :dragging false
                             :trails []

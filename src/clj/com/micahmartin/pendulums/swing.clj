@@ -62,8 +62,8 @@
 
 (defonce *state
   (atom {:system (engine/make-system
-                   [(engine/make-pendulum {:theta 0.8 :length 1.5})
-                    (engine/make-pendulum {:theta 0.5 :length 1.2})])
+                   [(engine/make-pendulum {:theta 0.8 :length 1.0})
+                    (engine/make-pendulum {:theta 0.5 :length 1.0})])
          :running false
          :selected nil
          :dragging false
@@ -105,8 +105,8 @@
   (swap! *state assoc
          :running false
          :system (engine/make-system
-                   [(engine/make-pendulum {:theta 0.8 :length 1.5})
-                    (engine/make-pendulum {:theta 0.5 :length 1.2})])
+                   [(engine/make-pendulum {:theta 0.8 :length 1.0})
+                    (engine/make-pendulum {:theta 0.5 :length 1.0})])
          :selected nil
          :dragging false
          :zoom 1.0
