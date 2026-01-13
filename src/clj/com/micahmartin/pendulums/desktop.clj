@@ -519,7 +519,7 @@
       (.addKeyListener angle-input-field
         (proxy [KeyAdapter] []
           (keyPressed [e]
-            (case (.getKeyCode e)
+            (condp = (.getKeyCode e)
               KeyEvent/VK_ENTER (do
                                   (submit-angle-edit!)
                                   (.setVisible angle-input-field false)
