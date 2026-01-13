@@ -248,15 +248,20 @@
       (or (= button 2) (= button 3))
       (swap! *state assoc :panning true :pan-start [mx my])
 
-      ;; Left-click on angle display (when not running) - opens input dialog
-      (and (= button 1) (not running))
-      (if-let [angle-idx (hit-test-angle-display system mx my)]
-        (prompt-angle-input! angle-idx)
-        ;; Otherwise check for bob selection
-        (let [hit-idx (hit-test-bob system mx my zoom pan)]
-          (if hit-idx
-            (swap! *state assoc :selected hit-idx :dragging true)
-            (swap! *state assoc :selected nil :dragging false)))))))
+      ;; Left-click
+      (= button 1)
+      (cond
+        ;; When not running, check for angle display interaction first
+        (and (not running) (hit-test-angle-display system mx my))
+        (prompt-angle-input! (hit-test-angle-display system mx my))
+
+        ;; When not running, check for bob selection for dragging
+        (and (not running) (hit-test-bob system mx my zoom pan))
+        (swap! *state assoc :selected (hit-test-bob system mx my zoom pan) :dragging true)
+
+        ;; Otherwise (empty space), start panning
+        :else
+        (swap! *state assoc :panning true :pan-start [mx my] :selected nil)))))
 
 (defn handle-mouse-move [mx my]
   (let [{:keys [dragging panning running system selected zoom pan pan-start]} @*state]
