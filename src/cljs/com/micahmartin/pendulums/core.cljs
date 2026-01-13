@@ -574,7 +574,6 @@
     [:div.controls
      [:button.primary {:on-click toggle-simulation!}
       (if running "Pause" "Play")]
-     [:button {:on-click reset-simulation!} "Reset"]
      [:button {:on-click add-pendulum!} "+ Pendulum"]
      [:button {:on-click remove-pendulum!
                :disabled (< n 2)}
