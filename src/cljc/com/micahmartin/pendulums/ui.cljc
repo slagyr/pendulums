@@ -111,3 +111,35 @@
 (def btn-bg-color-css (hex->css btn-bg-color))
 (def btn-fg-color-css (hex->css btn-fg-color))
 (def text-color-css (hex->css text-color))
+
+;; -----------------------------------------------------------------------------
+;; Coordinate Transformations
+;; -----------------------------------------------------------------------------
+
+(defn get-pivot
+  "Returns [pivot-x pivot-y] based on canvas width."
+  [canvas-width]
+  [(/ canvas-width 2) pivot-y-offset])
+
+(defn world->screen
+  "Converts world (physics) coordinates to screen coordinates."
+  [[wx wy] zoom [pan-x pan-y] canvas-width]
+  (let [[pivot-x pivot-y] (get-pivot canvas-width)]
+    [(+ (* (+ pivot-x (* wx scale)) zoom) pan-x)
+     (+ (* (- pivot-y (* wy scale)) zoom) pan-y)]))
+
+(defn screen->world
+  "Converts screen coordinates to world (physics) coordinates."
+  [[sx sy] zoom [pan-x pan-y] canvas-width]
+  (let [[pivot-x pivot-y] (get-pivot canvas-width)
+        unzoomed-x (/ (- sx pan-x) zoom)
+        unzoomed-y (/ (- sy pan-y) zoom)]
+    [(/ (- unzoomed-x pivot-x) scale)
+     (/ (- pivot-y unzoomed-y) scale)]))
+
+(defn pivot-screen-pos
+  "Returns the screen position of the main pivot point."
+  [zoom [pan-x pan-y] canvas-width]
+  (let [[pivot-x pivot-y] (get-pivot canvas-width)]
+    [(+ (* pivot-x zoom) pan-x)
+     (+ (* pivot-y zoom) pan-y)]))

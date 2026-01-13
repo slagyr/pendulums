@@ -88,4 +88,79 @@
       (should= {:theta 0.5 :length 1.0} (second ui/initial-pendulums)))
 
     (it "has new pendulum config"
-      (should= {:theta 0.3 :length 1.0} ui/new-pendulum-config))))
+      (should= {:theta 0.3 :length 1.0} ui/new-pendulum-config)))
+
+  (describe "coordinate transformations"
+
+    (describe "get-pivot"
+      (it "returns pivot at center-x and pivot-y-offset"
+        (should= [400 150.0] (ui/get-pivot 800)))
+
+      (it "centers pivot horizontally based on canvas width"
+        (should= [500 150.0] (ui/get-pivot 1000))
+        (should= [300 150.0] (ui/get-pivot 600))))
+
+    (describe "world->screen"
+      (it "converts origin with no zoom/pan at default canvas width"
+        (let [[sx sy] (ui/world->screen [0 0] 1.0 [0.0 0.0] 800)]
+          (should= 400.0 sx)
+          (should= 150.0 sy)))
+
+      (it "converts positive world-x to screen right of pivot"
+        (let [[sx _] (ui/world->screen [1.0 0] 1.0 [0.0 0.0] 800)]
+          ;; 1.0 meter * 100 scale = 100 pixels right of pivot
+          (should= 500.0 sx)))
+
+      (it "converts positive world-y to screen above pivot (inverted)"
+        (let [[_ sy] (ui/world->screen [0 1.0] 1.0 [0.0 0.0] 800)]
+          ;; 1.0 meter * 100 scale = 100 pixels up from pivot
+          (should= 50.0 sy)))
+
+      (it "applies zoom factor"
+        (let [[sx sy] (ui/world->screen [0 0] 2.0 [0.0 0.0] 800)]
+          (should= 800.0 sx)  ; pivot-x * zoom
+          (should= 300.0 sy))) ; pivot-y * zoom
+
+      (it "applies pan offset"
+        (let [[sx sy] (ui/world->screen [0 0] 1.0 [50.0 30.0] 800)]
+          (should= 450.0 sx)  ; pivot-x + pan-x
+          (should= 180.0 sy)))) ; pivot-y + pan-y
+
+    (describe "screen->world"
+      (it "converts pivot screen position to world origin"
+        (let [[wx wy] (ui/screen->world [400.0 150.0] 1.0 [0.0 0.0] 800)]
+          (should= 0.0 wx)
+          (should= 0.0 wy)))
+
+      (it "converts screen position right of pivot to positive world-x"
+        (let [[wx _] (ui/screen->world [500.0 150.0] 1.0 [0.0 0.0] 800)]
+          (should= 1.0 wx)))
+
+      (it "converts screen position above pivot to positive world-y"
+        (let [[_ wy] (ui/screen->world [400.0 50.0] 1.0 [0.0 0.0] 800)]
+          (should= 1.0 wy)))
+
+      (it "is inverse of world->screen"
+        (let [world-pos [1.5 -0.5]
+              zoom 1.5
+              pan [20.0 -10.0]
+              canvas-width 800
+              screen-pos (ui/world->screen world-pos zoom pan canvas-width)
+              back-to-world (ui/screen->world screen-pos zoom pan canvas-width)]
+          (should= (first world-pos) (first back-to-world))
+          (should= (second world-pos) (second back-to-world)))))
+
+    (describe "pivot-screen-pos"
+      (it "returns pivot position at zoom 1 with no pan"
+        (should= [400.0 150.0] (ui/pivot-screen-pos 1.0 [0.0 0.0] 800)))
+
+      (it "scales pivot position with zoom"
+        (should= [800.0 300.0] (ui/pivot-screen-pos 2.0 [0.0 0.0] 800)))
+
+      (it "offsets pivot position with pan"
+        (should= [450.0 180.0] (ui/pivot-screen-pos 1.0 [50.0 30.0] 800)))
+
+      (it "applies both zoom and pan"
+        ;; pivot-x=400, pivot-y=150, zoom=2, pan=[10, 20]
+        ;; result = [400*2 + 10, 150*2 + 20] = [810, 320]
+        (should= [810.0 320.0] (ui/pivot-screen-pos 2.0 [10.0 20.0] 800))))))

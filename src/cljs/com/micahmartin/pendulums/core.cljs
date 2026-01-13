@@ -11,40 +11,6 @@
 
 (def colors ui/pendulum-colors-css)
 
-;; -----------------------------------------------------------------------------
-;; Coordinate Transformations
-;; -----------------------------------------------------------------------------
-;; TODO - MDM: Move to ui.cljc
-(defn get-pivot
-  "Returns [pivot-x pivot-y] based on canvas width."
-  [canvas-width]
-  [(/ canvas-width 2) ui/pivot-y-offset])
-
-;; TODO - MDM: Move to ui.cljc
-(defn world->screen
-  "Converts world (physics) coordinates to screen coordinates."
-  [[wx wy] zoom [pan-x pan-y] canvas-width]
-  (let [[pivot-x pivot-y] (get-pivot canvas-width)]
-    [(+ (* (+ pivot-x (* wx ui/scale)) zoom) pan-x)
-     (+ (* (- pivot-y (* wy ui/scale)) zoom) pan-y)]))
-
-;; TODO - MDM: Move to ui.cljc
-(defn screen->world
-  "Converts screen coordinates to world (physics) coordinates."
-  [[sx sy] zoom [pan-x pan-y] canvas-width]
-  (let [[pivot-x pivot-y] (get-pivot canvas-width)
-        unzoomed-x (/ (- sx pan-x) zoom)
-        unzoomed-y (/ (- sy pan-y) zoom)]
-    [(/ (- unzoomed-x pivot-x) ui/scale)
-     (/ (- pivot-y unzoomed-y) ui/scale)]))
-
-;; TODO - MDM: Move to ui.cljc
-(defn pivot-screen-pos
-  "Returns the screen position of the main pivot point."
-  [zoom [pan-x pan-y] canvas-width]
-  (let [[pivot-x pivot-y] (get-pivot canvas-width)]
-    [(+ (* pivot-x zoom) pan-x)
-     (+ (* pivot-y zoom) pan-y)]))
 
 ;; -----------------------------------------------------------------------------
 ;; Application State
@@ -130,7 +96,7 @@
   "Resets the view to fit all pendulums centered in the viewport."
   []
   (let [{:keys [system canvas-width canvas-height]} @app-state
-        [pivot-x pivot-y] (get-pivot canvas-width)
+        [pivot-x pivot-y] (ui/get-pivot canvas-width)
         pendulums (:pendulums system)
         ;; Calculate max extent (sum of all pendulum lengths)
         max-extent (if (seq pendulums)
@@ -173,7 +139,7 @@
   "Returns screen coordinates of all bobs."
   [system zoom pan canvas-width]
   (mapv (fn [[x y]]
-          (world->screen [x y] zoom pan canvas-width))
+          (ui/world->screen [x y] zoom pan canvas-width))
         (engine/bob-positions system)))
 
 ;; TODO - MDM: move to ui
@@ -201,7 +167,7 @@
    For idx 0, it's the main pivot. For idx > 0, it's the previous bob."
   [system idx zoom pan canvas-width]
   (if (zero? idx)
-    (pivot-screen-pos zoom pan canvas-width)
+    (ui/pivot-screen-pos zoom pan canvas-width)
     (let [positions (bob-screen-positions system zoom pan canvas-width)]
       (nth positions (dec idx)))))
 
@@ -402,7 +368,7 @@
         (doseq [{:keys [pos time]} trail]
           (let [age (- now time)
                 alpha (max 0.0 (- 1.0 (/ age duration-ms)))
-                [sx sy] (world->screen pos zoom pan canvas-width)
+                [sx sy] (ui/world->screen pos zoom pan canvas-width)
                 radius (* ui/trail-dot-radius zoom)]
             (when (> alpha 0.0)
               (set! (.-fillStyle ctx) (str "rgba(" r "," g "," b "," alpha ")"))
@@ -413,7 +379,7 @@
 (defn draw-pendulum-system [ctx system running trails trail-duration zoom pan canvas-width canvas-height editing-angle]
   (let [positions (engine/bob-positions system)
         pendulums (:pendulums system)
-        [piv-sx piv-sy] (pivot-screen-pos zoom pan canvas-width)]
+        [piv-sx piv-sy] (ui/pivot-screen-pos zoom pan canvas-width)]
     ;; Clear canvas
     (.clearRect ctx 0 0 canvas-width canvas-height)
 
@@ -427,7 +393,7 @@
            bobs positions]
       (when (seq bobs)
         (let [[x y] (first bobs)
-              [screen-x screen-y] (world->screen [x y] zoom pan canvas-width)
+              [screen-x screen-y] (ui/world->screen [x y] zoom pan canvas-width)
               color (nth colors (mod idx (count colors)))]
 
           ;; Draw arm
