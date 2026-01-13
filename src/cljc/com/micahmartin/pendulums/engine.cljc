@@ -306,3 +306,22 @@
   (update sys :pendulums
           (fn [pends]
             (update pends idx #(assoc % :theta theta :omega 0.0)))))
+
+(defn step-with-trails
+  "Steps the simulation forward by dt and updates the trails.
+   Returns [new-system new-trails].
+   trails: vector of trail vectors, each trail vector contains maps {:pos [x y] :time t}
+   trail-duration: how long to keep trail points (seconds)
+   now: current time (milliseconds)"
+  [system dt trail-duration trails now]
+  (let [new-system (step system dt)
+        positions (bob-positions new-system)
+        cutoff (- now (* trail-duration 1000))
+        ;; Add new positions to trails and prune old entries
+        new-trails (vec (map-indexed
+                         (fn [idx [x y]]
+                           (let [old-trail (get trails idx [])
+                                 pruned (filterv #(> (:time %) cutoff) old-trail)]
+                             (conj pruned {:pos [x y] :time now})))
+                         positions))]
+    [new-system new-trails]))

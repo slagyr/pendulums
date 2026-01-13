@@ -111,4 +111,29 @@
         (should< (math/abs (first (first positions))) tolerance)
         (should< (math/abs (- -1.0 (second (first positions)))) tolerance)
         (should< (math/abs (first (second positions))) tolerance)
-        (should< (math/abs (- -2.0 (second (second positions)))) tolerance)))))
+        (should< (math/abs (- -2.0 (second (second positions)))) tolerance))))
+
+  (describe "step-with-trails"
+    (it "returns new system and trails"
+      (let [p (engine/make-pendulum {:theta 0.5 :omega 0.0})
+            sys (engine/make-system [p])
+            [new-sys new-trails] (engine/step-with-trails sys 0.01 3.0 [] 1000)]
+        (should= 1 (count new-trails))
+        (should= 1 (count (first new-trails)))
+        (should= 1000 (:time (first (first new-trails))))))
+
+    (it "accumulates trail points over time"
+      (let [p (engine/make-pendulum {:theta 0.5 :omega 0.0})
+            sys (engine/make-system [p])
+            [sys1 trails1] (engine/step-with-trails sys 0.01 3.0 [] 1000)
+            [sys2 trails2] (engine/step-with-trails sys1 0.01 3.0 trails1 2000)]
+        (should= 2 (count (first trails2)))))
+
+    (it "prunes old trail points based on duration"
+      (let [p (engine/make-pendulum {:theta 0.5 :omega 0.0})
+            sys (engine/make-system [p])
+            old-trails [[{:pos [0 0] :time 1000}]]  ; 1 second old
+            ;; now=5000ms, duration=3s, so cutoff=2000ms, trail at 1000 should be pruned
+            [_ new-trails] (engine/step-with-trails sys 0.01 3.0 old-trails 5000)]
+        (should= 1 (count (first new-trails)))  ; only the new point
+        (should= 5000 (:time (first (first new-trails))))))))

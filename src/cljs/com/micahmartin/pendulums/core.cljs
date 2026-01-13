@@ -28,21 +28,11 @@
 ;; Simulation Control
 ;; -----------------------------------------------------------------------------
 
-;; TODO - MDM: This fn has lots of feature-envy.  It seems like it should go in engine.
 (defn step-simulation! []
-  (let [now (.now js/Date)]                                 ;; TODO - MDM: use c3kit.time.now instead of js/Date
+  (let [now (.now js/Date)]
     (swap! app-state
-           (fn [{:keys [system trail-duration] :as state}]
-             (let [new-system (engine/step system ui/dt)
-                   positions (engine/bob-positions new-system)
-                   cutoff (- now (* trail-duration 1000))
-                   ;; Add new positions to trails and prune old entries
-                   new-trails (vec (map-indexed
-                                     (fn [idx [x y]]
-                                       (let [old-trail (get (:trails state) idx [])
-                                             pruned (filterv #(> (:time %) cutoff) old-trail)]
-                                         (conj pruned {:pos [x y] :time now})))
-                                     positions))]
+           (fn [{:keys [system trail-duration trails] :as state}]
+             (let [[new-system new-trails] (engine/step-with-trails system ui/dt trail-duration trails now)]
                (assoc state :system new-system :trails new-trails))))))
 
 (defn animation-loop []
