@@ -16,10 +16,9 @@
   ui/UI
   (start [_]
     (when-not (:running? @*state)
-      (swap! *state assoc :running? true :selected nil :dragging? false)))
+      (swap! *state ui/prepare-start)))
   (stop [_]
-    ;; TODO - MDM: This swap is duplicated (almost) with web.  Extract into fn in ui.
-    (swap! *state assoc :running? false)))
+    (swap! *state ui/prepare-stop)))
 
 ;; -----------------------------------------------------------------------------
 ;; Constants (derived from shared ui.cljc)

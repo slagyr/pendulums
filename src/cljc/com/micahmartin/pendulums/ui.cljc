@@ -239,6 +239,16 @@
 ;; State Transformations
 ;; -----------------------------------------------------------------------------
 
+(defn prepare-start
+  "Prepares state for starting simulation. Sets running, clears selection."
+  [state]
+  (assoc state :running? true :selected nil :dragging? false))
+
+(defn prepare-stop
+  "Prepares state for stopping simulation."
+  [state]
+  (assoc state :running? false))
+
 (defn add-pendulum
   "Adds a new pendulum to the system with default configuration. Clears trails."
   [state]

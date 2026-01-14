@@ -48,12 +48,12 @@
   ui/UI
   (start [_]
     (when-not (:running? @*state)
-      (swap! *state assoc :running? true :selected nil :dragging? false) ;; TODO - MDM: duplicated with desktop.  Extract into fn in ui.
+      (swap! *state ui/prepare-start)
       (animation-loop *state)))
   (stop [_]
     (when-let [id (:animation-id @*state)]
       (js/cancelAnimationFrame id))
-    (swap! *state assoc :running? false :animation-id nil)))
+    (swap! *state #(-> % ui/prepare-stop (assoc :animation-id nil)))))
 
 ;; TODO - MDM: move to ui
 (defn start-simulation! []
