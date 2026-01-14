@@ -105,18 +105,6 @@
     (= button 1)
     (swap! *state ui/handle-mouse-down mx my)))
 
-;; TODO - MDM: move to ui with a !
-(defn handle-mouse-move [mx my]
-  (swap! *state ui/handle-mouse-move mx my))
-
-;; TODO - MDM: move to ui with a !
-(defn handle-mouse-up []
-  (swap! *state ui/handle-mouse-up))
-
-;; TODO - MDM: move to ui with a !
-(defn handle-mouse-wheel [mx my rotation]
-  (swap! *state ui/handle-mouse-wheel mx my rotation))
-
 ;; -----------------------------------------------------------------------------
 ;; Canvas Rendering
 ;; -----------------------------------------------------------------------------
@@ -469,17 +457,17 @@
             (handle-mouse-down (.getX e) (.getY e) (.getButton e))
             (.repaint panel))
           (mouseReleased [e]
-            (handle-mouse-up)
+            (ui/handle-mouse-up! *state)
             (.repaint panel))))
       (.addMouseMotionListener panel
         (proxy [MouseMotionAdapter] []
           (mouseDragged [e]
-            (handle-mouse-move (.getX e) (.getY e))
+            (ui/handle-mouse-move! *state (.getX e) (.getY e))
             (.repaint panel))))
       (.addMouseWheelListener panel
         (reify MouseWheelListener
           (mouseWheelMoved [_ e]
-            (handle-mouse-wheel (.getX e) (.getY e) (.getWheelRotation e))
+            (ui/handle-mouse-wheel! *state (.getX e) (.getY e) (.getWheelRotation e))
             (.repaint panel))))
       (.addComponentListener panel
         (proxy [ComponentAdapter] []

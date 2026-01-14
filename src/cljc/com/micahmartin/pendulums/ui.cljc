@@ -432,3 +432,18 @@
         new-pan-x (- mx (* scale-ratio (- mx pan-x)))
         new-pan-y (- my (* scale-ratio (- my pan-y)))]
     (assoc state :zoom new-zoom :pan [new-pan-x new-pan-y])))
+
+(defn handle-mouse-move!
+  "Handles mouse move. Mutates *state."
+  [*state mx my]
+  (swap! *state handle-mouse-move mx my))
+
+(defn handle-mouse-up!
+  "Handles mouse up. Mutates *state."
+  [*state]
+  (swap! *state handle-mouse-up))
+
+(defn handle-mouse-wheel!
+  "Handles mouse wheel zoom. Mutates *state."
+  [*state mx my rotation]
+  (swap! *state handle-mouse-wheel mx my rotation))

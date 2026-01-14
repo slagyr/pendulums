@@ -72,16 +72,16 @@
 
 (defn handle-mouse-move [e canvas]
   (let [[mx my] (get-canvas-coords e canvas)]
-    (swap! app-state ui/handle-mouse-move mx my)))
+    (ui/handle-mouse-move! app-state mx my)))
 
 (defn handle-mouse-up [_e _canvas]
-  (swap! app-state ui/handle-mouse-up))
+  (ui/handle-mouse-up! app-state))
 
 (defn handle-mouse-wheel [e canvas]
   (let [[mx my] (get-canvas-coords e canvas)
         rotation (.-deltaY e)]
     (.preventDefault e)
-    (swap! app-state ui/handle-mouse-wheel mx my rotation)))
+    (ui/handle-mouse-wheel! app-state mx my rotation)))
 
 ;; -----------------------------------------------------------------------------
 ;; Angle Display
