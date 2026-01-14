@@ -24,7 +24,8 @@
                   :angle-input ""
                   :canvas-width ui/default-canvas-width
                   :canvas-height ui/default-canvas-height
-                  :ui nil})))
+                  :ui nil
+                  :show-info? false})))
 
 ;; -----------------------------------------------------------------------------
 ;; Simulation Control
@@ -335,7 +336,7 @@
             :title "Center screen"
             :style {:position "absolute"
                     :top "10px"
-                    :right "10px"
+                    :right "54px"
                     :width "36px"
                     :height "36px"
                     :border-radius "50%"
@@ -348,6 +349,80 @@
                     :align-items "center"
                     :justify-content "center"}}
    "◎"])
+
+(defn info-button []
+  [:button {:on-click #(swap! app-state assoc :show-info? true)
+            :title "About"
+            :style {:position "absolute"
+                    :top "10px"
+                    :right "10px"
+                    :width "36px"
+                    :height "36px"
+                    :border-radius "50%"
+                    :border "none"
+                    :background-color "rgba(64, 64, 64, 0.8)"
+                    :color "#fafaf9"
+                    :font-size "18px"
+                    :cursor "pointer"
+                    :display "flex"
+                    :align-items "center"
+                    :justify-content "center"}}
+   "i"])
+
+(defn info-modal []
+  (let [{:keys [show-info?]} @app-state]
+    (when show-info?
+      [:div.info-modal-overlay
+       {:style {:position "absolute"
+                :top 0
+                :left 0
+                :right 0
+                :bottom 0
+                :background-color "rgba(0, 0, 0, 0.7)"
+                :display "flex"
+                :align-items "center"
+                :justify-content "center"
+                :z-index 100}
+        :on-click #(swap! app-state assoc :show-info? false)}
+       [:div.info-modal
+        {:style {:background-color "#1e1e1e"
+                 :border-radius "12px"
+                 :padding "24px"
+                 :max-width "400px"
+                 :color "#fafaf9"
+                 :box-shadow "0 4px 20px rgba(0, 0, 0, 0.5)"}
+         :on-click #(.stopPropagation %)}
+        [:h2 {:style {:margin-top 0
+                      :margin-bottom "16px"
+                      :font-size "20px"
+                      :font-weight "600"}}
+         "Pendulum Simulator"]
+        [:p {:style {:margin-bottom "12px"
+                     :line-height "1.5"
+                     :color "#c8c8c8"}}
+         "A physics simulation of coupled pendulums demonstrating chaotic motion."]
+        [:h3 {:style {:margin-bottom "8px"
+                      :font-size "14px"
+                      :font-weight "600"}}
+         "Controls"]
+        [:ul {:style {:margin 0
+                      :padding-left "20px"
+                      :color "#c8c8c8"
+                      :line-height "1.6"}}
+         [:li "Drag bobs to reposition (when paused)"]
+         [:li "Scroll to zoom in/out"]
+         [:li "Click angles to edit directly"]
+         [:li "+/- buttons to add or remove pendulums"]]
+        [:button {:on-click #(swap! app-state assoc :show-info? false)
+                  :style {:margin-top "20px"
+                          :padding "8px 16px"
+                          :background-color "rgba(64, 64, 64, 0.8)"
+                          :border "none"
+                          :border-radius "6px"
+                          :color "#fafaf9"
+                          :cursor "pointer"
+                          :font-size "14px"}}
+         "Close"]]])))
 
 (defn add-remove-buttons []
   (let [{:keys [system]} @app-state
@@ -404,7 +479,9 @@
     [add-remove-buttons]
     [trail-slider]
     [center-button]
-    [play-pause-button]]])
+    [info-button]
+    [play-pause-button]
+    [info-modal]]])
 
 ;; -----------------------------------------------------------------------------
 ;; Entry Point
