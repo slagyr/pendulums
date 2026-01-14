@@ -21,6 +21,7 @@ class PendulumView @JvmOverloads constructor(
         fun onBobDragStart(index: Int)
         fun onBobDrag(index: Int, theta: Float)
         fun onBobDragEnd()
+        fun onAngleDisplayTapped(index: Int)
     }
 
     private val armPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -48,6 +49,24 @@ class PendulumView @JvmOverloads constructor(
     private val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
     }
+
+    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = PendulumUI.TEXT_COLOR
+        textSize = 36f  // Will be adjusted for density
+        typeface = android.graphics.Typeface.MONOSPACE
+    }
+
+    private val swatchPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+
+    private val swatchOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = PendulumUI.BOB_OUTLINE_COLOR
+        strokeWidth = 2f
+        style = Paint.Style.STROKE
+    }
+
+    var editingAngle: Int? = null
 
     var system: IPersistentMap? = null
         set(value) {
@@ -87,6 +106,9 @@ class PendulumView @JvmOverloads constructor(
     private var isPanning: Boolean = false
     private var lastTouchX: Float = 0f
     private var lastTouchY: Float = 0f
+    private var potentialAngleTap: Int? = null  // Track potential angle display tap
+    private var touchStartX: Float = 0f
+    private var touchStartY: Float = 0f
 
     private val scaleGestureDetector = ScaleGestureDetector(
         context,
@@ -125,9 +147,24 @@ class PendulumView @JvmOverloads constructor(
             MotionEvent.ACTION_DOWN -> {
                 lastTouchX = x
                 lastTouchY = y
+                touchStartX = x
+                touchStartY = y
+                potentialAngleTap = null
 
-                // Only allow bob dragging when simulation is stopped
+                // Only allow interactions when simulation is stopped
                 if (!isSimulationRunning) {
+                    // Check for angle display hit first
+                    val sys = system
+                    if (sys != null) {
+                        val pendulumCount = PendulumEngine.getPendulumCount(sys)
+                        val angleHit = PendulumUI.hitTestAngleDisplay(x, y, pendulumCount)
+                        if (angleHit != null) {
+                            potentialAngleTap = angleHit
+                            return true
+                        }
+                    }
+
+                    // Check for bob drag
                     val hitBob = hitTestBob(x, y)
                     if (hitBob != null) {
                         selectedBob = hitBob
@@ -165,12 +202,24 @@ class PendulumView @JvmOverloads constructor(
             }
 
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                // Check if this was a tap on the angle display
+                if (event.actionMasked == MotionEvent.ACTION_UP && potentialAngleTap != null) {
+                    val dx = x - touchStartX
+                    val dy = y - touchStartY
+                    val distance = sqrt(dx * dx + dy * dy)
+                    // If finger didn't move much, treat as a tap
+                    if (distance < 20) {
+                        listener?.onAngleDisplayTapped(potentialAngleTap!!)
+                    }
+                }
+
                 if (isDraggingBob) {
                     listener?.onBobDragEnd()
                 }
                 isDraggingBob = false
                 isPanning = false
                 selectedBob = null
+                potentialAngleTap = null
                 return true
             }
         }
@@ -276,6 +325,9 @@ class PendulumView @JvmOverloads constructor(
             prevX = screenX
             prevY = screenY
         }
+
+        // Draw angle display (not affected by zoom/pan)
+        drawAngleDisplay(canvas)
     }
 
     private fun drawTrails(canvas: Canvas, canvasWidth: Float, now: Long) {
@@ -307,6 +359,48 @@ class PendulumView @JvmOverloads constructor(
                     trailPaint.color = (color and 0x00FFFFFF) or (alpha shl 24)
                     canvas.drawCircle(screenX, screenY, PendulumUI.TRAIL_DOT_RADIUS * zoom, trailPaint)
                 }
+            }
+        }
+    }
+
+    private fun drawAngleDisplay(canvas: Canvas) {
+        val sys = system ?: return
+        val pendulums = PendulumEngine.getPendulums(sys)
+        if (pendulums.count() == 0) return
+
+        val padding = PendulumUI.ANGLE_DISPLAY_PADDING
+        val lineHeight = PendulumUI.ANGLE_DISPLAY_LINE_HEIGHT
+        val headerY = padding + lineHeight
+        val swatchSize = 24f
+        val numX = padding + swatchSize + 8f
+        val angleX = numX + 40f
+
+        // Header
+        textPaint.color = PendulumUI.TEXT_COLOR
+        canvas.drawText("#", numX, headerY, textPaint)
+        canvas.drawText("Angle", angleX, headerY, textPaint)
+
+        // Draw each pendulum's angle row
+        for (idx in 0 until pendulums.count()) {
+            val pendulum = pendulums.nth(idx) as IPersistentMap
+            val theta = PendulumEngine.getPendulumTheta(pendulum).toFloat()
+            val displayAngle = PendulumUI.normalizeAngle(theta)
+            val y = headerY + (idx + 1) * lineHeight
+            val isEditing = editingAngle == idx
+
+            // Draw color swatch
+            swatchPaint.color = PendulumUI.getPendulumColor(idx)
+            canvas.drawRect(padding, y - 20f, padding + swatchSize, y + 4f, swatchPaint)
+            canvas.drawRect(padding, y - 20f, padding + swatchSize, y + 4f, swatchOutlinePaint)
+
+            // Draw pendulum number
+            textPaint.color = PendulumUI.TEXT_COLOR
+            canvas.drawText("${idx + 1}", numX, y, textPaint)
+
+            // Draw angle (skip if this row is being edited)
+            if (!isEditing) {
+                val angleStr = String.format("%.2f°", displayAngle)
+                canvas.drawText(angleStr, angleX, y, textPaint)
             }
         }
     }

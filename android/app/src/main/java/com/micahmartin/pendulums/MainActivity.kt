@@ -8,10 +8,11 @@ import androidx.appcompat.app.AppCompatActivity
 import clojure.lang.IPersistentMap
 import clojure.lang.IPersistentVector
 
-class MainActivity : AppCompatActivity(), PendulumView.Listener, OverlayControls.Listener {
+class MainActivity : AppCompatActivity(), PendulumView.Listener, OverlayControls.Listener, AngleInputOverlay.Listener {
 
     private lateinit var pendulumView: PendulumView
     private lateinit var overlayControls: OverlayControls
+    private lateinit var angleInputOverlay: AngleInputOverlay
     private val handler = Handler(Looper.getMainLooper())
 
     private var system: IPersistentMap? = null
@@ -52,12 +53,20 @@ class MainActivity : AppCompatActivity(), PendulumView.Listener, OverlayControls
             listener = this@MainActivity
         }
 
+        angleInputOverlay = AngleInputOverlay(this).apply {
+            listener = this@MainActivity
+        }
+
         val layout = FrameLayout(this).apply {
             addView(pendulumView, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             ))
             addView(overlayControls, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            ))
+            addView(angleInputOverlay, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             ))
@@ -148,6 +157,19 @@ class MainActivity : AppCompatActivity(), PendulumView.Listener, OverlayControls
         // For now, leave it stopped so user can position pendulums
     }
 
+    override fun onAngleDisplayTapped(index: Int) {
+        system?.let { sys ->
+            val pendulums = PendulumEngine.getPendulums(sys)
+            if (index < pendulums.count()) {
+                val pendulum = pendulums.nth(index) as IPersistentMap
+                val theta = PendulumEngine.getPendulumTheta(pendulum).toFloat()
+                val displayAngle = PendulumUI.normalizeAngle(theta)
+                pendulumView.editingAngle = index
+                angleInputOverlay.showForIndex(index, displayAngle)
+            }
+        }
+    }
+
     // OverlayControls.Listener implementation
     override fun onPlayPauseClicked() {
         toggleSimulation()
@@ -169,6 +191,22 @@ class MainActivity : AppCompatActivity(), PendulumView.Listener, OverlayControls
         trailDuration = duration.toDouble()
         trails = clojure.lang.PersistentVector.EMPTY
         pendulumView.trails = trails
+    }
+
+    // AngleInputOverlay.Listener implementation
+    override fun onAngleSubmitted(index: Int, angle: Float) {
+        system?.let { sys ->
+            val theta = PendulumUI.displayAngleToTheta(angle)
+            system = PendulumEngine.setPendulumAngle(sys, index, theta.toDouble())
+            trails = clojure.lang.PersistentVector.EMPTY
+            pendulumView.system = system
+            pendulumView.trails = trails
+            pendulumView.editingAngle = null
+        }
+    }
+
+    override fun onAngleEditCancelled() {
+        pendulumView.editingAngle = null
     }
 
     override fun onPause() {

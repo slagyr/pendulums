@@ -43,6 +43,11 @@ object PendulumUI {
     const val BTN_FG_COLOR = 0xFFffffff.toInt()
     const val TEXT_COLOR = 0xFFc8c8c8.toInt()
 
+    // Angle display constants
+    const val ANGLE_DISPLAY_PADDING = 10f
+    const val ANGLE_DISPLAY_LINE_HEIGHT = 20f
+    const val ANGLE_DISPLAY_ROW_WIDTH = 180f
+
     // Default state values
     const val DEFAULT_ZOOM = 1.0f
     const val DEFAULT_TRAIL_DURATION = 3.0f
@@ -124,5 +129,48 @@ object PendulumUI {
 
     fun emptyTrails(): IPersistentVector {
         return clojure.lang.PersistentVector.EMPTY
+    }
+
+    /**
+     * Converts physics theta to display angle where 0°=up, 90°=right, 180°=down, 270°=left.
+     * Like a compass heading where angles increase clockwise.
+     */
+    fun normalizeAngle(theta: Float): Float {
+        // Negate theta because physics convention is counter-clockwise, compass is clockwise
+        val degrees = -theta * (180f / Math.PI.toFloat())
+        // Add 180 so that theta=0 (down) becomes 180°, theta=π (up) becomes 0°
+        val shifted = degrees + 180f
+        // Normalize to 0-360 range
+        var normalized = shifted % 360f
+        if (normalized < 0) normalized += 360f
+        return normalized
+    }
+
+    /**
+     * Converts display angle (0°=up, 90°=right, 180°=down, 270°=left) back to physics theta.
+     */
+    fun displayAngleToTheta(displayAngle: Float): Float {
+        return (180f - displayAngle) * (Math.PI.toFloat() / 180f)
+    }
+
+    /**
+     * Hit tests the angle display area to determine which row was tapped.
+     * Returns the index of the pendulum row that was hit, or null if not hit.
+     */
+    fun hitTestAngleDisplay(mx: Float, my: Float, pendulumCount: Int): Int? {
+        if (mx > ANGLE_DISPLAY_ROW_WIDTH) return null
+
+        val headerY = ANGLE_DISPLAY_PADDING + ANGLE_DISPLAY_LINE_HEIGHT
+
+        for (idx in 0 until pendulumCount) {
+            val rowY = headerY + (idx + 1) * ANGLE_DISPLAY_LINE_HEIGHT
+            val top = rowY - 12
+            val bottom = rowY + 4
+
+            if (my >= top && my <= bottom) {
+                return idx
+            }
+        }
+        return null
     }
 }

@@ -4,10 +4,15 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
+import android.text.InputType
 import android.util.AttributeSet
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.SeekBar
@@ -253,5 +258,105 @@ class PlayPauseButton @JvmOverloads constructor(
     override fun performClick(): Boolean {
         super.performClick()
         return true
+    }
+}
+
+class AngleInputOverlay @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0
+) : FrameLayout(context, attrs, defStyleAttr) {
+
+    interface Listener {
+        fun onAngleSubmitted(index: Int, angle: Float)
+        fun onAngleEditCancelled()
+    }
+
+    var listener: Listener? = null
+    private var editingIndex: Int = -1
+    private val editText: EditText
+
+    init {
+        editText = EditText(context).apply {
+            setBackgroundColor(PendulumUI.BG_COLOR)
+            setTextColor(PendulumUI.TEXT_COLOR)
+            textSize = 14f
+            typeface = android.graphics.Typeface.MONOSPACE
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED
+            imeOptions = EditorInfo.IME_ACTION_DONE
+            setPadding(8, 4, 8, 4)
+            visibility = View.GONE
+
+            setOnEditorActionListener { _, actionId, event ->
+                if (actionId == EditorInfo.IME_ACTION_DONE ||
+                    (event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN)) {
+                    submitEdit()
+                    true
+                } else {
+                    false
+                }
+            }
+
+            setOnFocusChangeListener { _, hasFocus ->
+                if (!hasFocus) {
+                    cancelEdit()
+                }
+            }
+        }
+
+        addView(editText, LayoutParams(200, LayoutParams.WRAP_CONTENT))
+    }
+
+    fun showForIndex(index: Int, currentAngle: Float) {
+        editingIndex = index
+
+        // Position the EditText at the correct row
+        val padding = PendulumUI.ANGLE_DISPLAY_PADDING
+        val lineHeight = PendulumUI.ANGLE_DISPLAY_LINE_HEIGHT
+        val headerY = padding + lineHeight
+        val rowY = headerY + (index + 1) * lineHeight
+
+        val params = editText.layoutParams as LayoutParams
+        params.leftMargin = (padding + 24 + 8 + 40).toInt() // Same as angleX in drawAngleDisplay
+        params.topMargin = (rowY - 24).toInt()
+        editText.layoutParams = params
+
+        editText.setText(String.format("%.2f", currentAngle))
+        editText.visibility = View.VISIBLE
+        editText.requestFocus()
+        editText.selectAll()
+
+        // Show keyboard
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        editText.postDelayed({
+            imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
+        }, 100)
+    }
+
+    fun hide() {
+        editText.visibility = View.GONE
+        editText.clearFocus()
+
+        // Hide keyboard
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(editText.windowToken, 0)
+    }
+
+    fun isShowing(): Boolean = editText.visibility == View.VISIBLE
+
+    fun getEditingIndex(): Int = editingIndex
+
+    private fun submitEdit() {
+        val text = editText.text.toString()
+        val angle = text.toFloatOrNull()
+        if (angle != null && editingIndex >= 0) {
+            listener?.onAngleSubmitted(editingIndex, angle)
+        }
+        hide()
+    }
+
+    private fun cancelEdit() {
+        listener?.onAngleEditCancelled()
+        hide()
     }
 }
