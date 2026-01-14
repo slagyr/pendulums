@@ -74,12 +74,12 @@
   (describe "state defaults"
     (it "has default-state with correct structure"
       (should-not-be-nil ui/default-state)
-      (should= false (:running ui/default-state))
+      (should= false (:running? ui/default-state))
       (should= nil (:selected ui/default-state))
-      (should= false (:dragging ui/default-state))
+      (should= false (:dragging? ui/default-state))
       (should= 1.0 (:zoom ui/default-state))
       (should= [0.0 0.0] (:pan ui/default-state))
-      (should= false (:panning ui/default-state))
+      (should= false (:panning? ui/default-state))
       (should= nil (:pan-start ui/default-state))
       (should= [] (:trails ui/default-state))
       (should= 3.0 (:trail-duration ui/default-state)))

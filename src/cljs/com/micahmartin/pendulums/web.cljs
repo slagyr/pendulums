@@ -33,48 +33,53 @@
 (defn step-simulation! [*state]
   (let [now (time/now)]
     (swap! *state
+           ;; TODO - MDM: extract this anonymouse fn into a private defn with a name that describes what it does
            (fn [{:keys [system trail-duration trails] :as state}]
              (let [[new-system new-trails] (engine/step-with-trails system ui/dt trail-duration trails now)]
                (assoc state :system new-system :trails new-trails))))))
 
-(declare animation-loop)
-
-(deftype WebUI [*state]
-  ui/UI
-  (start [_]
-    (when-not (:running @*state)
-      (swap! *state assoc :running true :selected nil :dragging false)
-      (animation-loop *state)))
-  (stop [_]
-    (when-let [id (:animation-id @*state)]
-      (js/cancelAnimationFrame id))
-    (swap! *state assoc :running false :animation-id nil)))
-
 (defn animation-loop [*state]
-  (when (:running @*state)
+  (when (:running? @*state)
     (step-simulation! *state)
     (let [id (js/requestAnimationFrame #(animation-loop *state))]
       (swap! *state assoc :animation-id id))))
 
+(deftype WebUI [*state]
+  ui/UI
+  (start [_]
+    (when-not (:running? @*state)
+      (swap! *state assoc :running? true :selected nil :dragging? false) ;; TODO - MDM: duplicated with desktop.  Extract into fn in ui.
+      (animation-loop *state)))
+  (stop [_]
+    (when-let [id (:animation-id @*state)]
+      (js/cancelAnimationFrame id))
+    (swap! *state assoc :running? false :animation-id nil)))
+
+;; TODO - MDM: move to ui
 (defn start-simulation! []
   (when-let [web-ui (:ui @app-state)]
     (ui/start web-ui)))
 
+;; TODO - MDM: move to ui
 (defn stop-simulation! []
   (when-let [web-ui (:ui @app-state)]
     (ui/stop web-ui)))
 
+;; TODO - MDM: move to ui
 (defn toggle-simulation! []
-  (if (:running @app-state)
+  (if (:running? @app-state)
     (stop-simulation!)
     (start-simulation!)))
 
+;; TODO - MDM: move to ui
 (defn add-pendulum! []
   (swap! app-state ui/add-pendulum))
 
+;; TODO - MDM: move to ui
 (defn remove-pendulum! []
   (swap! app-state ui/remove-pendulum))
 
+;; TODO - MDM: move to ui
 (defn center-view! []
   (swap! app-state ui/center-view))
 
@@ -146,9 +151,11 @@
           (.fillText ctx angle-str angle-x y))))))
 
 
+;; TODO - MDM: delete me if I'm not used
 (defn start-angle-edit! [idx]
   (swap! app-state ui/start-angle-edit idx))
 
+;; TODO - MDM: move to ui
 (defn cancel-angle-edit! []
   (swap! app-state ui/cancel-angle-edit))
 
@@ -271,12 +278,12 @@
          (when-let [canvas @canvas-ref]
            (let [ctx (.getContext canvas "2d")]
              (add-watch app-state :render
-                        (fn [_ _ _ {:keys [system running trails trail-duration zoom pan canvas-width canvas-height editing-angle]}]
-                          (draw-pendulum-system ctx system running trails trail-duration zoom pan canvas-width canvas-height editing-angle)))
+                        (fn [_ _ _ {:keys [system running? trails trail-duration zoom pan canvas-width canvas-height editing-angle]}]
+                          (draw-pendulum-system ctx system running? trails trail-duration zoom pan canvas-width canvas-height editing-angle)))
              ;; Set canvas size directly on DOM and draw immediately
              (update-canvas-size! container-ref canvas-ref)
-             (let [{:keys [system running trails trail-duration zoom pan canvas-width canvas-height editing-angle]} @app-state]
-               (draw-pendulum-system ctx system running trails trail-duration zoom pan canvas-width canvas-height editing-angle))
+             (let [{:keys [system running? trails trail-duration zoom pan canvas-width canvas-height editing-angle]} @app-state]
+               (draw-pendulum-system ctx system running? trails trail-duration zoom pan canvas-width canvas-height editing-angle))
              ;; Start simulation automatically
              (start-simulation!))))
 
@@ -289,14 +296,14 @@
        :reagent-render
        (fn []
          (let [canvas @canvas-ref
-               {:keys [running]} @app-state]
+               {:keys [running?]} @app-state]
            [:div.canvas-container
             {:ref #(reset! container-ref %)
              :style {:width "100%" :height "100%"}}
             ;; Canvas dimensions set via DOM in update-canvas-size! to avoid
             ;; React re-renders clearing the canvas
             [:canvas {:ref #(reset! canvas-ref %)
-                      :style {:cursor (if running "default" "pointer")
+                      :style {:cursor (if running? "default" "pointer")
                               :display "block"}
                       :on-mouse-down #(when canvas (handle-mouse-down % canvas))
                       :on-mouse-move #(when canvas (handle-mouse-move % canvas))
@@ -340,7 +347,7 @@
   (swap! app-state assoc :trail-duration duration))
 
 (defn play-pause-button []
-  (let [{:keys [running]} @app-state]
+  (let [{:keys [running?]} @app-state]
     [:button.play-pause
      {:on-click toggle-simulation!
       :style {:position "absolute"
@@ -351,7 +358,7 @@
               :height "48px"
               :border-radius "50%"
               :border "none"
-              :background-color (if running "rgba(245, 158, 11, 0.9)" "rgba(34, 197, 94, 0.9)")
+              :background-color (if running? "rgba(245, 158, 11, 0.9)" "rgba(34, 197, 94, 0.9)")
               :color "#000"
               :font-size "18px"
               :cursor "pointer"
@@ -360,8 +367,8 @@
               :justify-content "center"
               :padding "0"}}
      [:span {:style {:display "inline-block"
-                     :transform (if running "none" "translateX(2px)")}}
-      (if running "⏸" "▶")]]))
+                     :transform (if running? "none" "translateX(2px)")}}
+      (if running? "⏸" "▶")]]))
 
 (defn center-button []
   [:button {:on-click center-view!

@@ -15,10 +15,11 @@
 (deftype DesktopUI [*state ^Timer timer]
   ui/UI
   (start [_]
-    (when-not (:running @*state)
-      (swap! *state assoc :running true :selected nil :dragging false)))
+    (when-not (:running? @*state)
+      (swap! *state assoc :running? true :selected nil :dragging? false)))
   (stop [_]
-    (swap! *state assoc :running false)))
+    ;; TODO - MDM: This swap is duplicated (almost) with web.  Extract into fn in ui.
+    (swap! *state assoc :running? false)))
 
 ;; -----------------------------------------------------------------------------
 ;; Constants (derived from shared ui.cljc)
@@ -66,16 +67,17 @@
 
 (defn toggle-simulation! []
   (if-let [desktop-ui (:ui @*state)]
-    (if (:running @*state)
+    (if (:running? @*state)
       (ui/stop desktop-ui)
       (ui/start desktop-ui))
     ;; Fallback if UI not yet initialized
     (swap! *state (fn [state]
-                    (let [new-running (not (:running state))]
+                    (let [new-running (not (:running? state))]
                       (if new-running
-                        (assoc state :running true :selected nil :dragging false)
-                        (assoc state :running false)))))))
+                        (assoc state :running? true :selected nil :dragging? false)
+                        (assoc state :running? false)))))))
 
+;; TODO - MDM: delete me if not used
 (defn reset-simulation! []
   (swap! *state (fn [{:keys [canvas-width canvas-height]}]
                   (assoc ui/default-state
@@ -86,12 +88,15 @@
                          :system (engine/make-system
                                    (mapv engine/make-pendulum ui/initial-pendulums))))))
 
+;; TODO - MDM: move to ui
 (defn add-pendulum! []
   (swap! *state ui/add-pendulum))
 
+;; TODO - MDM: move to ui
 (defn remove-pendulum! []
   (swap! *state ui/remove-pendulum))
 
+;; TODO - MDM: move to ui
 (defn center-view! []
   (swap! *state ui/center-view))
 
@@ -99,6 +104,7 @@
 ;; Mouse Interaction
 ;; -----------------------------------------------------------------------------
 
+;; TODO - MDM: move to ui
 (defn cancel-angle-edit! []
   (swap! *state ui/cancel-angle-edit))
 
@@ -115,18 +121,21 @@
   (cond
     ;; Right-click or middle-click starts panning
     (or (= button 2) (= button 3))
-    (swap! *state assoc :panning true :pan-start [mx my])
+    (swap! *state assoc :panning? true :pan-start [mx my])
 
     ;; Left-click uses shared handler
     (= button 1)
     (swap! *state ui/handle-mouse-down mx my)))
 
+;; TODO - MDM: move to ui with a !
 (defn handle-mouse-move [mx my]
   (swap! *state ui/handle-mouse-move mx my))
 
+;; TODO - MDM: move to ui with a !
 (defn handle-mouse-up []
   (swap! *state ui/handle-mouse-up))
 
+;; TODO - MDM: move to ui with a !
 (defn handle-mouse-wheel [mx my rotation]
   (swap! *state ui/handle-mouse-wheel mx my rotation))
 
@@ -335,11 +344,11 @@
         panel (proxy [JPanel] []
                 (paintComponent [^Graphics2D g]
                   (proxy-super paintComponent g)
-                  (let [{:keys [system running zoom pan trails trail-duration canvas-width canvas-height editing-angle]} @*state]
+                  (let [{:keys [system running? zoom pan trails trail-duration canvas-width canvas-height editing-angle]} @*state]
                     (.setColor g bg-color)
                     (.fillRect g 0 0 canvas-width canvas-height)
                     (draw-trails g trails trail-duration zoom pan canvas-width)
-                    (draw-pendulum-system g system running zoom pan canvas-width)
+                    (draw-pendulum-system g system running? zoom pan canvas-width)
                     (draw-angle-display g system editing-angle))))
 
         ;; Function to reposition controls when canvas resizes
@@ -375,7 +384,7 @@
                     (.setRenderingHint g RenderingHints/KEY_ANTIALIASING RenderingHints/VALUE_ANTIALIAS_ON)
                     (let [w (.getWidth this)
                           h (.getHeight this)
-                          running (:running @*state)
+                          running (:running? @*state)
                           base-color (if running pause-color play-color)
                           bg (if (and (.getModel this) (.isPressed (.getModel this)))
                                (.darker base-color)
@@ -552,7 +561,7 @@
             timer (Timer. 16
                     (reify ActionListener
                       (actionPerformed [_ _]
-                        (when (:running @*state)
+                        (when (:running? @*state)
                           (step-simulation!)
                           (.repaint canvas)))))
             desktop-ui (DesktopUI. *state timer)]

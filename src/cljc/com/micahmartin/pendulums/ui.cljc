@@ -111,12 +111,12 @@
 
 ;; Default state map (platform-specific keys should be merged in)
 (def default-state
-  {:running false
+  {:running? false
    :selected nil
-   :dragging false
+   :dragging? false
    :zoom default-zoom
    :pan default-pan
-   :panning false
+   :panning? false
    :pan-start nil
    :trails []
    :trail-duration default-trail-duration
@@ -329,29 +329,29 @@
 (defn handle-mouse-down
   "Handles mouse down at coordinates (mx, my). Returns updated state."
   [state mx my]
-  (let [{:keys [running system zoom pan canvas-width]} state
+  (let [{:keys [running? system zoom pan canvas-width]} state
         angle-hit (hit-test-angle-display system mx my)
         bob-hit (hit-test-bob system mx my zoom pan canvas-width)]
     (cond
       ;; Check for angle display click first (when not running)
-      (and (not running) angle-hit)
+      (and (not running?) angle-hit)
       (start-angle-edit state angle-hit)
 
       ;; Bob selection for dragging (when not running)
-      (and (not running) bob-hit)
-      (assoc state :selected bob-hit :dragging true)
+      (and (not running?) bob-hit)
+      (assoc state :selected bob-hit :dragging? true)
 
       ;; Clicked on empty space - start panning
       :else
-      (assoc state :selected nil :dragging false :panning true :pan-start [mx my]))))
+      (assoc state :selected nil :dragging? false :panning? true :pan-start [mx my]))))
 
 (defn handle-mouse-move
   "Handles mouse move at coordinates (mx, my). Returns updated state."
   [state mx my]
-  (let [{:keys [dragging panning running system selected zoom pan pan-start canvas-width]} state]
+  (let [{:keys [dragging? panning? running? system selected zoom pan pan-start canvas-width]} state]
     (cond
       ;; Handle panning
-      panning
+      panning?
       (let [[start-x start-y] pan-start
             [pan-x pan-y] pan
             dx (- mx start-x)
@@ -361,7 +361,7 @@
                :pan-start [mx my]))
 
       ;; Handle bob dragging (when not running)
-      (and dragging (not running))
+      (and dragging? (not running?))
       (let [pivot (pivot-for-pendulum system selected zoom pan canvas-width)
             new-theta (angle-from-pivot pivot [mx my])]
         (update state :system engine/set-pendulum-angle selected new-theta))
@@ -371,7 +371,7 @@
 (defn handle-mouse-up
   "Handles mouse up. Returns updated state with dragging/panning cleared."
   [state]
-  (assoc state :dragging false :panning false :pan-start nil))
+  (assoc state :dragging? false :panning? false :pan-start nil))
 
 (defn handle-mouse-wheel
   "Handles mouse wheel zoom centered on mouse position (mx, my).
