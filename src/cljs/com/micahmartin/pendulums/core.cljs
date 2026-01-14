@@ -140,28 +140,16 @@
 (defn cancel-angle-edit! []
   (swap! app-state ui/cancel-angle-edit))
 
-;; TODO - MDM: extract the parsing so that this fn takes a float and move to ui
 (defn submit-angle-edit! []
   (let [{:keys [editing-angle angle-input]} @app-state]
-    (when editing-angle
-      (when-let [display-angle (js/parseFloat angle-input)]
-        (when-not (js/isNaN display-angle)
-          (let [new-theta (ui/display-angle->theta display-angle)]
-            (swap! app-state update :system engine/set-pendulum-angle editing-angle new-theta)))))
-    (cancel-angle-edit!)))
+    (if (and editing-angle
+             (not (js/isNaN (js/parseFloat angle-input))))
+      (swap! app-state ui/submit-angle-edit (js/parseFloat angle-input))
+      (cancel-angle-edit!))))
 
 ;; -----------------------------------------------------------------------------
 ;; Canvas Rendering
 ;; -----------------------------------------------------------------------------
-
-;; TODO - MDM: move to ui
-(defn hex->rgb
-  "Converts a hex color string like '#ef4444' to [r g b]."
-  [hex]
-  (let [hex (if (= \# (first hex)) (subs hex 1) hex)]
-    [(js/parseInt (subs hex 0 2) 16)
-     (js/parseInt (subs hex 2 4) 16)
-     (js/parseInt (subs hex 4 6) 16)]))
 
 (defn draw-trails
   "Draws fading trails for each pendulum bob."
@@ -170,8 +158,8 @@
         duration-ms (* trail-duration 1000)]
     (set! (.-lineWidth ctx) (* 2 zoom))
     (doseq [[idx trail] (map-indexed vector trails)]
-      (let [color (nth colors (mod idx (count colors)))
-            [r g b] (hex->rgb color)]
+      (let [color (nth ui/pendulum-colors (mod idx (count ui/pendulum-colors)))
+            [r g b] (ui/hex->rgb color)]
         (doseq [{:keys [pos time]} trail]
           (let [age (- now time)
                 alpha (max 0.0 (- 1.0 (/ age duration-ms)))

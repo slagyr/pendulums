@@ -307,6 +307,16 @@
   [state]
   (assoc state :editing-angle nil :angle-input ""))
 
+(defn submit-angle-edit
+  "Submits angle edit with the given display-angle (in degrees).
+   Updates the pendulum theta and clears editing state. Returns updated state."
+  [state display-angle]
+  (let [{:keys [editing-angle]} state
+        new-theta (display-angle->theta display-angle)]
+    (-> state
+        (update :system engine/set-pendulum-angle editing-angle new-theta)
+        (assoc :editing-angle nil :angle-input ""))))
+
 (defn handle-mouse-down
   "Handles mouse down at coordinates (mx, my). Returns updated state."
   [state mx my]

@@ -89,13 +89,12 @@
 
 (defn submit-angle-edit! []
   (let [{:keys [editing-angle angle-input]} @*state]
-    (when editing-angle
+    (if editing-angle
       (try
-        (let [display-angle (Double/parseDouble angle-input)
-              new-theta (ui/display-angle->theta display-angle)]
-          (swap! *state update :system engine/set-pendulum-angle editing-angle new-theta))
-        (catch NumberFormatException _)))
-    (cancel-angle-edit!)))
+        (swap! *state ui/submit-angle-edit (Double/parseDouble angle-input))
+        (catch NumberFormatException _
+          (cancel-angle-edit!)))
+      (cancel-angle-edit!))))
 
 (defn handle-mouse-down [mx my button]
   (cond
