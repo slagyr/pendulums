@@ -56,22 +56,6 @@
     (swap! *state #(-> % ui/prepare-stop (assoc :animation-id nil)))))
 
 ;; TODO - MDM: move to ui
-(defn start-simulation! []
-  (when-let [web-ui (:ui @app-state)]
-    (ui/start web-ui)))
-
-;; TODO - MDM: move to ui
-(defn stop-simulation! []
-  (when-let [web-ui (:ui @app-state)]
-    (ui/stop web-ui)))
-
-;; TODO - MDM: move to ui
-(defn toggle-simulation! []
-  (if (:running? @app-state)
-    (stop-simulation!)
-    (start-simulation!)))
-
-;; TODO - MDM: move to ui
 (defn add-pendulum! []
   (swap! app-state ui/add-pendulum))
 
@@ -285,7 +269,7 @@
              (let [{:keys [system running? trails trail-duration zoom pan canvas-width canvas-height editing-angle]} @app-state]
                (draw-pendulum-system ctx system running? trails trail-duration zoom pan canvas-width canvas-height editing-angle))
              ;; Start simulation automatically
-             (start-simulation!))))
+             (ui/start-simulation! app-state))))
 
        :component-will-unmount
        (fn [_]
@@ -349,7 +333,7 @@
 (defn play-pause-button []
   (let [{:keys [running?]} @app-state]
     [:button.play-pause
-     {:on-click toggle-simulation!
+     {:on-click #(ui/toggle-simulation! app-state)
       :style {:position "absolute"
               :bottom "20px"
               :left "50%"

@@ -11,6 +11,25 @@
   (start [this] "Starts the UI rendering/animation loop.")
   (stop [this] "Stops the UI rendering/animation loop."))
 
+(defn start-simulation!
+  "Starts the simulation using the UI instance stored in *state."
+  [*state]
+  (when-let [ui (:ui @*state)]
+    (start ui)))
+
+(defn stop-simulation!
+  "Stops the simulation using the UI instance stored in *state."
+  [*state]
+  (when-let [ui (:ui @*state)]
+    (stop ui)))
+
+(defn toggle-simulation!
+  "Toggles the simulation between running and stopped states."
+  [*state]
+  (if (:running? @*state)
+    (stop-simulation! *state)
+    (start-simulation! *state)))
+
 ;; -----------------------------------------------------------------------------
 ;; Simulation Constants
 ;; -----------------------------------------------------------------------------

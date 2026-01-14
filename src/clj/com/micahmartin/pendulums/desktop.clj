@@ -65,16 +65,7 @@
                (assoc state :system new-system :trails new-trails))))))
 
 (defn toggle-simulation! []
-  (if-let [desktop-ui (:ui @*state)]
-    (if (:running? @*state)
-      (ui/stop desktop-ui)
-      (ui/start desktop-ui))
-    ;; Fallback if UI not yet initialized
-    (swap! *state (fn [state]
-                    (let [new-running (not (:running? state))]
-                      (if new-running
-                        (assoc state :running? true :selected nil :dragging? false)
-                        (assoc state :running? false)))))))
+  (ui/toggle-simulation! *state))
 
 ;; TODO - MDM: delete me if not used
 (defn reset-simulation! []
