@@ -127,16 +127,13 @@
 (defn start-angle-edit! [idx]
   (swap! app-state ui/start-angle-edit idx))
 
-;; TODO - MDM: move to ui
-(defn cancel-angle-edit! []
-  (swap! app-state ui/cancel-angle-edit))
 
 (defn submit-angle-edit! []
   (let [{:keys [editing-angle angle-input]} @app-state]
     (if (and editing-angle
              (not (js/isNaN (js/parseFloat angle-input))))
       (swap! app-state ui/submit-angle-edit (js/parseFloat angle-input))
-      (cancel-angle-edit!))))
+      (ui/cancel-angle-edit! app-state))))
 
 ;; -----------------------------------------------------------------------------
 ;; Canvas Rendering
@@ -310,9 +307,9 @@
                   :on-key-down (fn [e]
                                  (case (.-key e)
                                    "Enter" (submit-angle-edit!)
-                                   "Escape" (cancel-angle-edit!)
+                                   "Escape" (ui/cancel-angle-edit! app-state)
                                    nil))
-                  :on-blur cancel-angle-edit!}]
+                  :on-blur #(ui/cancel-angle-edit! app-state)}]
          [:span {:style {:margin-left "2px" :color "#c8c8c8" :font-family "monospace" :font-size "14px"}} "°"]]))))
 
 (defn set-trail-duration! [duration]

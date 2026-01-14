@@ -82,18 +82,14 @@
 ;; Mouse Interaction
 ;; -----------------------------------------------------------------------------
 
-;; TODO - MDM: move to ui
-(defn cancel-angle-edit! []
-  (swap! *state ui/cancel-angle-edit))
-
 (defn submit-angle-edit! []
   (let [{:keys [editing-angle angle-input]} @*state]
     (if editing-angle
       (try
         (swap! *state ui/submit-angle-edit (Double/parseDouble angle-input))
         (catch NumberFormatException _
-          (cancel-angle-edit!)))
-      (cancel-angle-edit!))))
+          (ui/cancel-angle-edit! *state)))
+      (ui/cancel-angle-edit! *state))))
 
 (defn handle-mouse-down [mx my button]
   (cond
@@ -418,7 +414,7 @@
                                   (.setVisible angle-input-field false)
                                   (.repaint panel))
               KeyEvent/VK_ESCAPE (do
-                                   (cancel-angle-edit!)
+                                   (ui/cancel-angle-edit! *state)
                                    (.setVisible angle-input-field false)
                                    (.repaint panel))
               nil))))

@@ -360,6 +360,11 @@
   [state]
   (assoc state :editing-angle nil :angle-input ""))
 
+(defn cancel-angle-edit!
+  "Cancels angle editing. Mutates *state."
+  [*state]
+  (swap! *state cancel-angle-edit))
+
 (defn submit-angle-edit
   "Submits angle edit with the given display-angle (in degrees).
    Updates the pendulum theta and clears editing state. Returns updated state."
