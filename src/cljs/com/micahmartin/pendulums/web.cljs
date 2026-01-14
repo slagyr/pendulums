@@ -32,11 +32,7 @@
 
 (defn step-simulation! [*state]
   (let [now (time/now)]
-    (swap! *state
-           ;; TODO - MDM: extract this anonymouse fn into a private defn with a name that describes what it does
-           (fn [{:keys [system trail-duration trails] :as state}]
-             (let [[new-system new-trails] (engine/step-with-trails system ui/dt trail-duration trails now)]
-               (assoc state :system new-system :trails new-trails))))))
+    (swap! *state ui/step-state now)))
 
 (defn animation-loop [*state]
   (when (:running? @*state)

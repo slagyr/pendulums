@@ -37,6 +37,14 @@
 (def dt 0.016)                    ; Simulation time step (~60 fps)
 (def scale 100.0)                 ; Pixels per meter
 
+(defn step-state
+  "Advances the simulation by one time step. Takes current state and timestamp,
+   returns updated state with new system and trails."
+  [state now]
+  (let [{:keys [system trail-duration trails]} state
+        [new-system new-trails] (engine/step-with-trails system dt trail-duration trails now)]
+    (assoc state :system new-system :trails new-trails)))
+
 ;; -----------------------------------------------------------------------------
 ;; Canvas / Viewport Constants
 ;; -----------------------------------------------------------------------------

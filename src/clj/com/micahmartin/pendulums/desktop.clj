@@ -59,10 +59,7 @@
 
 (defn step-simulation! []
   (let [now (System/currentTimeMillis)]
-    (swap! *state
-           (fn [{:keys [system trail-duration trails] :as state}]
-             (let [[new-system new-trails] (engine/step-with-trails system ui/dt trail-duration trails now)]
-               (assoc state :system new-system :trails new-trails))))))
+    (swap! *state ui/step-state now)))
 
 (defn toggle-simulation! []
   (ui/toggle-simulation! *state))
