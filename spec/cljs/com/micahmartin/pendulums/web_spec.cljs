@@ -1,4 +1,4 @@
-(ns com.micahmartin.pendulums.core-spec
+(ns com.micahmartin.pendulums.web-spec
   (:require-macros [c3kit.wire.spec-helperc :refer [stub-now should-select should-not-select should-have-invoked-ws
                                                     should-have-invoked-ajax-post should-have-invoked-ajax-get]]
                    [speclj.core :refer [after after-all around around-all before before before-all context describe
@@ -11,9 +11,9 @@
                                         should-start-with should-throw should< should<= should= should== should>
                                         should>= stub tags with with-all with-stubs xit]])
   (:require [speclj.core]
-            [com.micahmartin.pendulums.core :as sut]))
+            [com.micahmartin.pendulums.web :as sut]))
 
-(describe "Core"
+(describe "Web"
 
   ;(it "something"
   ;  (should= 1 2))

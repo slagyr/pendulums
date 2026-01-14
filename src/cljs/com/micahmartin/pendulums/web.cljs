@@ -1,4 +1,4 @@
-(ns com.micahmartin.pendulums.core
+(ns com.micahmartin.pendulums.web
   "Web UI entry point using Reagent."
   (:require [c3kit.apron.time :as time]
             [reagent.core :as r]
