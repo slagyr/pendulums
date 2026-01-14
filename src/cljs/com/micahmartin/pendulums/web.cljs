@@ -55,18 +55,6 @@
       (js/cancelAnimationFrame id))
     (swap! *state #(-> % ui/prepare-stop (assoc :animation-id nil)))))
 
-;; TODO - MDM: move to ui
-(defn add-pendulum! []
-  (swap! app-state ui/add-pendulum))
-
-;; TODO - MDM: move to ui
-(defn remove-pendulum! []
-  (swap! app-state ui/remove-pendulum))
-
-;; TODO - MDM: move to ui
-(defn center-view! []
-  (swap! app-state ui/center-view))
-
 ;; -----------------------------------------------------------------------------
 ;; Mouse Interaction
 ;; -----------------------------------------------------------------------------
@@ -355,7 +343,7 @@
       (if running? "⏸" "▶")]]))
 
 (defn center-button []
-  [:button {:on-click center-view!
+  [:button {:on-click #(ui/center-view! app-state)
             :title "Center screen"
             :style {:position "absolute"
                     :top "10px"
@@ -383,7 +371,7 @@
                    :display "flex"
                    :gap "8px"
                    :align-items "center"}}
-     [:button {:on-click remove-pendulum!
+     [:button {:on-click #(ui/remove-pendulum! app-state)
                :disabled (< n 2)
                :style {:padding "4px 8px"
                        :cursor "pointer"
@@ -392,7 +380,7 @@
                        :border-radius "4px"
                        :color "#fafaf9"}} "-"]
      [:span {:style {:color "#c8c8c8" :font-size "12px"}} (str n " pendulums")]
-     [:button {:on-click add-pendulum!
+     [:button {:on-click #(ui/add-pendulum! app-state)
                :style {:padding "4px 8px"
                        :cursor "pointer"
                        :background-color "rgba(64, 64, 64, 0.8)"

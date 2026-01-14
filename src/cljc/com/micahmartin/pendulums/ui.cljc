@@ -311,6 +311,21 @@
         pan-y (- (/ canvas-height 2.0) (* system-center-y fit-zoom))]
     (assoc state :zoom fit-zoom :pan [pan-x pan-y])))
 
+(defn add-pendulum!
+  "Adds a new pendulum to the system. Mutates *state."
+  [*state]
+  (swap! *state add-pendulum))
+
+(defn remove-pendulum!
+  "Removes the last pendulum from the system. Mutates *state."
+  [*state]
+  (swap! *state remove-pendulum))
+
+(defn center-view!
+  "Centers the view to fit all pendulums. Mutates *state."
+  [*state]
+  (swap! *state center-view))
+
 (defn hit-test-angle-display
   "Returns the index of the pendulum whose angle row was clicked, or nil."
   [system mx my]

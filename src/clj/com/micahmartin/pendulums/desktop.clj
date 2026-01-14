@@ -78,18 +78,6 @@
                          :system (engine/make-system
                                    (mapv engine/make-pendulum ui/initial-pendulums))))))
 
-;; TODO - MDM: move to ui
-(defn add-pendulum! []
-  (swap! *state ui/add-pendulum))
-
-;; TODO - MDM: move to ui
-(defn remove-pendulum! []
-  (swap! *state ui/remove-pendulum))
-
-;; TODO - MDM: move to ui
-(defn center-view! []
-  (swap! *state ui/center-view))
-
 ;; -----------------------------------------------------------------------------
 ;; Mouse Interaction
 ;; -----------------------------------------------------------------------------
@@ -352,19 +340,19 @@
         ;; Create overlay buttons (after panel is defined so we can reference it)
         minus-btn (create-small-button "-"
                     (fn []
-                      (remove-pendulum!)
+                      (ui/remove-pendulum! *state)
                       (let [n (engine/pendulum-count (:system @*state))]
                         (.setText count-label (str n " pendulums")))
                       (.repaint panel)))
         plus-btn (create-small-button "+"
                    (fn []
-                     (add-pendulum!)
+                     (ui/add-pendulum! *state)
                      (let [n (engine/pendulum-count (:system @*state))]
                        (.setText count-label (str n " pendulums")))
                      (.repaint panel)))
         center-btn (create-circular-button 36 overlay-btn-color Color/WHITE "◎"
                      (fn []
-                       (center-view!)
+                       (ui/center-view! *state)
                        (.repaint panel)))]
 
     ;; Create play button with dynamic color
