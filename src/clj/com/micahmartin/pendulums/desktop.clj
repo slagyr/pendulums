@@ -9,6 +9,18 @@
            [javax.swing.event ChangeListener DocumentListener]))
 
 ;; -----------------------------------------------------------------------------
+;; DesktopUI Protocol Implementation
+;; -----------------------------------------------------------------------------
+
+(deftype DesktopUI [*state ^Timer timer]
+  ui/UI
+  (start [_]
+    (when-not (:running @*state)
+      (swap! *state assoc :running true :selected nil :dragging false)))
+  (stop [_]
+    (swap! *state assoc :running false)))
+
+;; -----------------------------------------------------------------------------
 ;; Constants (derived from shared ui.cljc)
 ;; -----------------------------------------------------------------------------
 
@@ -37,6 +49,7 @@
                :canvas-height ui/default-canvas-height
                :editing-angle nil
                :angle-input ""
+               :ui nil
                :system (engine/make-system
                          (mapv engine/make-pendulum ui/initial-pendulums)))))
 
@@ -52,11 +65,16 @@
                (assoc state :system new-system :trails new-trails))))))
 
 (defn toggle-simulation! []
-  (swap! *state (fn [state]
-                  (let [new-running (not (:running state))]
-                    (if new-running
-                      (assoc state :running true :selected nil :dragging false)
-                      (assoc state :running false))))))
+  (if-let [desktop-ui (:ui @*state)]
+    (if (:running @*state)
+      (ui/stop desktop-ui)
+      (ui/start desktop-ui))
+    ;; Fallback if UI not yet initialized
+    (swap! *state (fn [state]
+                    (let [new-running (not (:running state))]
+                      (if new-running
+                        (assoc state :running true :selected nil :dragging false)
+                        (assoc state :running false)))))))
 
 (defn reset-simulation! []
   (swap! *state (fn [{:keys [canvas-width canvas-height]}]
@@ -80,9 +98,6 @@
 ;; -----------------------------------------------------------------------------
 ;; Mouse Interaction
 ;; -----------------------------------------------------------------------------
-
-(defn start-angle-edit! [idx]
-  (swap! *state ui/start-angle-edit idx))
 
 (defn cancel-angle-edit! []
   (swap! *state ui/cancel-angle-edit))
@@ -539,7 +554,11 @@
                       (actionPerformed [_ _]
                         (when (:running @*state)
                           (step-simulation!)
-                          (.repaint canvas)))))]
+                          (.repaint canvas)))))
+            desktop-ui (DesktopUI. *state timer)]
+
+        ;; Store UI instance in state
+        (swap! *state assoc :ui desktop-ui)
 
         ;; Build UI - canvas fills the entire frame
         (.add (.getContentPane frame) canvas BorderLayout/CENTER)
@@ -548,7 +567,7 @@
         (.start timer)
 
         ;; Start simulation automatically (like web UI)
-        (swap! *state assoc :running true)
+        (ui/start desktop-ui)
 
         ;; Configure and show frame
         (.setDefaultCloseOperation frame JFrame/EXIT_ON_CLOSE)

@@ -23,34 +23,46 @@
                   :editing-angle nil
                   :angle-input ""
                   :canvas-width ui/default-canvas-width
-                  :canvas-height ui/default-canvas-height})))
+                  :canvas-height ui/default-canvas-height
+                  :ui nil})))
 
 ;; -----------------------------------------------------------------------------
 ;; Simulation Control
 ;; -----------------------------------------------------------------------------
 
-(defn step-simulation! []
+(defn step-simulation! [*state]
   (let [now (time/now)]
-    (swap! app-state
+    (swap! *state
            (fn [{:keys [system trail-duration trails] :as state}]
              (let [[new-system new-trails] (engine/step-with-trails system ui/dt trail-duration trails now)]
                (assoc state :system new-system :trails new-trails))))))
 
-(defn animation-loop []
-  (when (:running @app-state)
-    (step-simulation!)
-    (let [id (js/requestAnimationFrame animation-loop)]
-      (swap! app-state assoc :animation-id id))))
+(declare animation-loop)
+
+(deftype WebUI [*state]
+  ui/UI
+  (start [_]
+    (when-not (:running @*state)
+      (swap! *state assoc :running true :selected nil :dragging false)
+      (animation-loop *state)))
+  (stop [_]
+    (when-let [id (:animation-id @*state)]
+      (js/cancelAnimationFrame id))
+    (swap! *state assoc :running false :animation-id nil)))
+
+(defn animation-loop [*state]
+  (when (:running @*state)
+    (step-simulation! *state)
+    (let [id (js/requestAnimationFrame #(animation-loop *state))]
+      (swap! *state assoc :animation-id id))))
 
 (defn start-simulation! []
-  (when-not (:running @app-state)
-    (swap! app-state assoc :running true :selected nil :dragging false)
-    (animation-loop)))
+  (when-let [web-ui (:ui @app-state)]
+    (ui/start web-ui)))
 
 (defn stop-simulation! []
-  (when-let [id (:animation-id @app-state)]
-    (js/cancelAnimationFrame id))
-  (swap! app-state assoc :running false :animation-id nil))
+  (when-let [web-ui (:ui @app-state)]
+    (ui/stop web-ui)))
 
 (defn toggle-simulation! []
   (if (:running @app-state)
@@ -432,6 +444,8 @@
 ;; -----------------------------------------------------------------------------
 
 (defn ^:export init []
+  ;; Create and store the WebUI instance
+  (swap! app-state assoc :ui (WebUI. app-state))
   (rdom/render [app-component]
                (.getElementById js/document "app")))
 

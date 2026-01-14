@@ -3,6 +3,15 @@
             [com.micahmartin.pendulums.engine :as engine]))
 
 ;; -----------------------------------------------------------------------------
+;; UI Protocol
+;; -----------------------------------------------------------------------------
+
+(defprotocol UI
+  "Protocol for platform-specific UI implementations."
+  (start [this] "Starts the UI rendering/animation loop.")
+  (stop [this] "Stops the UI rendering/animation loop."))
+
+;; -----------------------------------------------------------------------------
 ;; Simulation Constants
 ;; -----------------------------------------------------------------------------
 
