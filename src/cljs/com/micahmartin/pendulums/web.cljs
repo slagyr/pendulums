@@ -123,11 +123,6 @@
           (.fillText ctx angle-str angle-x y))))))
 
 
-;; TODO - MDM: delete me if I'm not used
-(defn start-angle-edit! [idx]
-  (swap! app-state ui/start-angle-edit idx))
-
-
 (defn submit-angle-edit! []
   (let [{:keys [editing-angle angle-input]} @app-state]
     (if (and editing-angle

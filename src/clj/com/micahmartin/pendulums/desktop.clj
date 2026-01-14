@@ -67,17 +67,6 @@
 (defn toggle-simulation! []
   (ui/toggle-simulation! *state))
 
-;; TODO - MDM: delete me if not used
-(defn reset-simulation! []
-  (swap! *state (fn [{:keys [canvas-width canvas-height]}]
-                  (assoc ui/default-state
-                         :canvas-width canvas-width
-                         :canvas-height canvas-height
-                         :editing-angle nil
-                         :angle-input ""
-                         :system (engine/make-system
-                                   (mapv engine/make-pendulum ui/initial-pendulums))))))
-
 ;; -----------------------------------------------------------------------------
 ;; Mouse Interaction
 ;; -----------------------------------------------------------------------------
