@@ -17,5 +17,7 @@
   :cljs {:main-opts ["-m" "c3kit.scaffold.cljs"]}
   :gui  {:main-opts ["-m" "com.micahmartin.pendulums.desktop"]}
   :spec {:main-opts ["-m" "speclj.main" "-c"]}
+  :build {:deps {io.github.clojure/tools.build {:mvn/version "0.10.6"}}
+          :ns-default build}
   }
  }
