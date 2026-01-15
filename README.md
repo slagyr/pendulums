@@ -1,6 +1,6 @@
 # Pendulums
 
-A coupled pendulum simulator.  
+A coupled pendulum simulator that lets you explore their potentially chaotic behavior.
 
 <table>
   <tr>
