@@ -1,0 +1,1 @@
+{:output-dir "web/cljs/", :cache-analysis true, :sources ["spec/cljc" "src/cljc" "src/cljs" "spec/cljs"], :optimizations :none, :verbose false, :output-to "web/cljs/pendulums_dev.js", :specs true, :source-map true, :watch-fn #'c3kit.scaffold.cljs/on-dev-compiled, :pretty-print true}
