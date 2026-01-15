@@ -62,6 +62,22 @@ Prerequisites:
 - Android Studio (or Android SDK with command line tools)
 - Java 17+
 
+#### Building the Engine JAR
+
+The Android app requires an AOT-compiled JAR of the Clojure engine with the Clojure runtime bundled:
+
+```shell
+# Build the Android JAR (includes Clojure runtime)
+clj -T:build android-jar
+
+# Copy to Android libs directory
+cp target/pendulums-engine-1.0.0.jar android/app/libs/
+```
+
+Rebuild the JAR whenever you modify the engine (`src/cljc/`) or UI (`src/clj/.../ui.clj`) code.
+
+#### Building and Running the App
+
 ```shell
 # build the debug APK
 cd android && ./gradlew assembleDebug
