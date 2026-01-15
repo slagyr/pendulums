@@ -36,6 +36,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +53,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import clojure.lang.IPersistentMap
@@ -149,10 +153,14 @@ fun PendulumScreen() {
             }
         )
 
-        // Control buttons (bottom right)
-        ControlButtons(
-            isPlaying = state.running,
-            onPlayPause = { state = state.copy(running = !state.running) },
+        // Get status bar padding for top controls
+        val statusBarPadding = WindowInsets.statusBars.asPaddingValues()
+        val topPadding = statusBarPadding.calculateTopPadding() + 10.dp
+
+        // Top center: +/- buttons with pendulum count and trail slider
+        TopControls(
+            pendulumCount = state.system?.let { PendulumEngine.getPendulumCount(it) } ?: 0,
+            trailDuration = state.trailDuration.toFloat(),
             onAdd = {
                 state.system?.let { sys ->
                     val newPendulum = PendulumEngine.createPendulum(theta = 0.3, length = 1.0)
@@ -170,7 +178,20 @@ fun PendulumScreen() {
                     )
                 }
             },
-            onCenter = {
+            onTrailDurationChange = { duration ->
+                state = state.copy(
+                    trailDuration = duration.toDouble(),
+                    trails = clojure.lang.PersistentVector.EMPTY
+                )
+            },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = topPadding)
+        )
+
+        // Top right: Center button
+        CenterButton(
+            onClick = {
                 state = state.copy(
                     zoom = PendulumUI.DEFAULT_ZOOM,
                     panX = 0f,
@@ -178,22 +199,17 @@ fun PendulumScreen() {
                 )
             },
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(24.dp)
+                .align(Alignment.TopEnd)
+                .padding(top = topPadding, end = 10.dp)
         )
 
-        // Trail duration slider (bottom left)
-        TrailSlider(
-            duration = state.trailDuration.toFloat(),
-            onDurationChange = { duration ->
-                state = state.copy(
-                    trailDuration = duration.toDouble(),
-                    trails = clojure.lang.PersistentVector.EMPTY
-                )
-            },
+        // Bottom center: Play/Pause button
+        PlayPauseButton(
+            isPlaying = state.running,
+            onClick = { state = state.copy(running = !state.running) },
             modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(24.dp)
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 24.dp)
         )
 
         // Angle input dialog
@@ -234,26 +250,29 @@ private fun PendulumCanvas(
 ) {
     var draggedBobIndex by remember { mutableStateOf<Int?>(null) }
     var wasRunningBeforeDrag by remember { mutableStateOf(false) }
+    // Use rememberUpdatedState to avoid stale state capture in gesture handlers
+    val currentState by rememberUpdatedState(state)
+    val currentOnStateChange by rememberUpdatedState(onStateChange)
 
     Canvas(
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(state.running) {
+            .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
                     val downPos = down.position
                     var dragStarted = false
 
                     // Check for bob hit when simulation is stopped
-                    if (!state.running && state.system != null) {
+                    if (!currentState.running && currentState.system != null) {
                         val hitBob = hitTestBob(
                             downPos.x, downPos.y,
-                            state.system!!, state.zoom, state.panX, state.panY,
-                            size.width.toFloat()
+                            currentState.system!!, currentState.zoom, currentState.panX, currentState.panY,
+                            size.width.toFloat(), size.height.toFloat()
                         )
                         if (hitBob != null) {
                             draggedBobIndex = hitBob
-                            wasRunningBeforeDrag = state.running
+                            wasRunningBeforeDrag = currentState.running
                             dragStarted = true
                         }
                     }
@@ -275,9 +294,9 @@ private fun PendulumCanvas(
                             val pos = changes.first().position
                             val pivotPos = getPivotForBob(
                                 draggedBobIndex!!,
-                                state.system!!,
-                                state.zoom, state.panX, state.panY,
-                                size.width.toFloat()
+                                currentState.system!!,
+                                currentState.zoom, currentState.panX, currentState.panY,
+                                size.width.toFloat(), size.height.toFloat()
                             )
                             if (pivotPos != null) {
                                 val theta = PendulumUI.angleFromPivot(
@@ -285,9 +304,9 @@ private fun PendulumCanvas(
                                     pos.x, pos.y
                                 )
                                 val newSystem = PendulumEngine.setPendulumAngle(
-                                    state.system!!, draggedBobIndex!!, theta.toDouble()
+                                    currentState.system!!, draggedBobIndex!!, theta.toDouble()
                                 )
-                                onStateChange(state.copy(
+                                currentOnStateChange(currentState.copy(
                                     system = newSystem,
                                     trails = clojure.lang.PersistentVector.EMPTY
                                 ))
@@ -295,24 +314,18 @@ private fun PendulumCanvas(
                         } else if (pointerCount >= 2 && prevSpan > 0f && span > 0f) {
                             // Pinch zoom
                             val zoomFactor = span / prevSpan
-                            val newZoom = (state.zoom * zoomFactor).coerceIn(0.1f, 10f)
-                            val scaleRatio = newZoom / state.zoom
+                            val newZoom = (currentState.zoom * zoomFactor).coerceIn(0.1f, 10f)
 
-                            val newPanX = centroid.x - scaleRatio * (centroid.x - state.panX)
-                            val newPanY = centroid.y - scaleRatio * (centroid.y - state.panY)
-
-                            onStateChange(state.copy(
-                                zoom = newZoom,
-                                panX = newPanX,
-                                panY = newPanY
+                            currentOnStateChange(currentState.copy(
+                                zoom = newZoom
                             ))
                         } else if (!dragStarted && pointerCount == 1) {
                             // Pan
                             val pan = event.calculatePan()
                             if (pan != Offset.Zero) {
-                                onStateChange(state.copy(
-                                    panX = state.panX + pan.x,
-                                    panY = state.panY + pan.y
+                                currentOnStateChange(currentState.copy(
+                                    panX = currentState.panX + pan.x,
+                                    panY = currentState.panY + pan.y
                                 ))
                             }
                         }
@@ -330,11 +343,11 @@ private fun PendulumCanvas(
         val now = System.currentTimeMillis()
 
         // Draw trails
-        drawTrails(state.trails, state.zoom, state.panX, state.panY, size.width, now)
+        drawTrails(state.trails, state.zoom, state.panX, state.panY, size.width, size.height, now)
 
         // Get pivot screen position
         val (pivotScreenX, pivotScreenY) = PendulumUI.pivotScreenPos(
-            state.zoom, state.panX, state.panY, size.width
+            state.zoom, state.panX, state.panY, size.width, size.height
         )
 
         // Draw pivot
@@ -359,7 +372,7 @@ private fun PendulumCanvas(
             val (worldX, worldY) = positions[i]
 
             val (screenX, screenY) = PendulumUI.worldToScreen(
-                worldX, worldY, state.zoom, state.panX, state.panY, size.width
+                worldX, worldY, state.zoom, state.panX, state.panY, size.width, size.height
             )
 
             // Draw arm
@@ -398,6 +411,7 @@ private fun DrawScope.drawTrails(
     panX: Float,
     panY: Float,
     canvasWidth: Float,
+    canvasHeight: Float,
     now: Long
 ) {
     if (trails.count() == 0) return
@@ -417,7 +431,7 @@ private fun DrawScope.drawTrails(
             val worldY = (pos.nth(1) as Number).toFloat()
 
             val (screenX, screenY) = PendulumUI.worldToScreen(
-                worldX, worldY, zoom, panX, panY, canvasWidth
+                worldX, worldY, zoom, panX, panY, canvasWidth, canvasHeight
             )
 
             val age = now - time
@@ -438,7 +452,7 @@ private fun hitTestBob(
     x: Float, y: Float,
     system: IPersistentMap,
     zoom: Float, panX: Float, panY: Float,
-    canvasWidth: Float
+    canvasWidth: Float, canvasHeight: Float
 ): Int? {
     val pendulums = PendulumEngine.getPendulums(system)
     val positions = PendulumEngine.getBobPositions(system)
@@ -448,7 +462,7 @@ private fun hitTestBob(
         val mass = PendulumEngine.getPendulumMass(pendulum).toFloat()
         val (worldX, worldY) = positions[i]
         val (screenX, screenY) = PendulumUI.worldToScreen(
-            worldX, worldY, zoom, panX, panY, canvasWidth
+            worldX, worldY, zoom, panX, panY, canvasWidth, canvasHeight
         )
 
         val bobRadius = PendulumUI.bobRadius(mass) * zoom
@@ -467,15 +481,15 @@ private fun getPivotForBob(
     bobIndex: Int,
     system: IPersistentMap,
     zoom: Float, panX: Float, panY: Float,
-    canvasWidth: Float
+    canvasWidth: Float, canvasHeight: Float
 ): Pair<Float, Float>? {
     return if (bobIndex == 0) {
-        PendulumUI.pivotScreenPos(zoom, panX, panY, canvasWidth)
+        PendulumUI.pivotScreenPos(zoom, panX, panY, canvasWidth, canvasHeight)
     } else {
         val positions = PendulumEngine.getBobPositions(system)
         if (bobIndex <= positions.size) {
             val (worldX, worldY) = positions[bobIndex - 1]
-            PendulumUI.worldToScreen(worldX, worldY, zoom, panX, panY, canvasWidth)
+            PendulumUI.worldToScreen(worldX, worldY, zoom, panX, panY, canvasWidth, canvasHeight)
         } else {
             null
         }
@@ -491,8 +505,13 @@ private fun AngleDisplay(
     val pendulums = PendulumEngine.getPendulums(sys)
     if (pendulums.count() == 0) return
 
+    // Get status bar height to avoid overlap with system time display
+    val statusBarPadding = WindowInsets.statusBars.asPaddingValues()
+
     Column(
-        modifier = Modifier.padding(10.dp)
+        modifier = Modifier
+            .padding(top = statusBarPadding.calculateTopPadding() + 10.dp)
+            .padding(start = 10.dp)
     ) {
         // Header row
         Row {
@@ -557,106 +576,134 @@ private fun AngleDisplay(
     }
 }
 
+// Play button green color (rgba(34, 197, 94, 0.9))
+private val PLAY_COLOR = Color(34, 197, 94, (0.9f * 255).toInt())
+// Pause button orange color (rgba(245, 158, 11, 0.9))
+private val PAUSE_COLOR = Color(245, 158, 11, (0.9f * 255).toInt())
+
 @Composable
-private fun ControlButtons(
-    isPlaying: Boolean,
-    onPlayPause: () -> Unit,
+private fun TopControls(
+    pendulumCount: Int,
+    trailDuration: Float,
     onAdd: () -> Unit,
     onRemove: () -> Unit,
-    onCenter: () -> Unit,
+    onTrailDurationChange: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalAlignment = Alignment.End,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = modifier
     ) {
-        // Play/Pause button
-        CircleButton(
-            onClick = onPlayPause,
-            size = 60,
-            modifier = Modifier
+        // +/- buttons with pendulum count
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (isPlaying) {
-                // Pause icon
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .size(width = 6.dp, height = 20.dp)
-                            .background(PendulumUI.BTN_FG_COLOR.toComposeColor())
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(width = 6.dp, height = 20.dp)
-                            .background(PendulumUI.BTN_FG_COLOR.toComposeColor())
-                    )
-                }
-            } else {
-                // Play icon (triangle)
-                Canvas(modifier = Modifier.size(24.dp)) {
-                    val path = Path().apply {
-                        moveTo(4f, 0f)
-                        lineTo(24f, 12f)
-                        lineTo(4f, 24f)
-                        close()
-                    }
-                    drawPath(path, color = PendulumUI.BTN_FG_COLOR.toComposeColor())
-                }
+            // Remove button
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(PendulumUI.BTN_BG_COLOR.toComposeColor().copy(alpha = 0.8f))
+                    .clickable(enabled = pendulumCount > 1, onClick = onRemove)
+            ) {
+                Text(
+                    "-",
+                    color = if (pendulumCount > 1) PendulumUI.BTN_FG_COLOR.toComposeColor() else Color.Gray,
+                    fontSize = 20.sp
+                )
+            }
+
+            // Pendulum count label
+            Text(
+                "$pendulumCount pendulums",
+                color = PendulumUI.TEXT_COLOR.toComposeColor(),
+                fontSize = 12.sp
+            )
+
+            // Add button
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(PendulumUI.BTN_BG_COLOR.toComposeColor().copy(alpha = 0.8f))
+                    .clickable(onClick = onAdd)
+            ) {
+                Text("+", color = PendulumUI.BTN_FG_COLOR.toComposeColor(), fontSize = 20.sp)
             }
         }
 
-        // Add button
-        CircleButton(onClick = onAdd, size = 50) {
-            Text("+", color = PendulumUI.BTN_FG_COLOR.toComposeColor(), fontSize = 28.sp)
-        }
-
-        // Remove button
-        CircleButton(onClick = onRemove, size = 50) {
-            Text("-", color = PendulumUI.BTN_FG_COLOR.toComposeColor(), fontSize = 28.sp)
-        }
-
-        // Center button
-        CircleButton(onClick = onCenter, size = 50) {
-            Text("[ ]", color = PendulumUI.BTN_FG_COLOR.toComposeColor(), fontSize = 16.sp)
+        // Trail slider with label
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "Trail:",
+                color = PendulumUI.TEXT_COLOR.toComposeColor(),
+                fontSize = 12.sp
+            )
+            Slider(
+                value = trailDuration / 10f,
+                onValueChange = { onTrailDurationChange(it * 10f) },
+                modifier = Modifier.width(100.dp),
+                colors = SliderDefaults.colors(
+                    thumbColor = PendulumUI.BTN_FG_COLOR.toComposeColor(),
+                    activeTrackColor = PendulumUI.BTN_FG_COLOR.toComposeColor(),
+                    inactiveTrackColor = PendulumUI.BTN_BG_COLOR.toComposeColor()
+                )
+            )
+            Text(
+                String.format("%.1fs", trailDuration),
+                color = PendulumUI.TEXT_COLOR.toComposeColor(),
+                fontSize = 12.sp
+            )
         }
     }
 }
 
 @Composable
-private fun CircleButton(
+private fun CenterButton(
     onClick: () -> Unit,
-    size: Int,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
+    modifier: Modifier = Modifier
 ) {
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .size(size.dp)
+            .size(36.dp)
             .clip(CircleShape)
-            .background(PendulumUI.BTN_BG_COLOR.toComposeColor())
+            .background(PendulumUI.BTN_BG_COLOR.toComposeColor().copy(alpha = 0.8f))
             .clickable(onClick = onClick)
     ) {
-        content()
+        Text("◎", color = PendulumUI.BTN_FG_COLOR.toComposeColor(), fontSize = 18.sp)
     }
 }
 
 @Composable
-private fun TrailSlider(
-    duration: Float,
-    onDurationChange: (Float) -> Unit,
+private fun PlayPauseButton(
+    isPlaying: Boolean,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Slider(
-        value = duration / 6f,
-        onValueChange = { onDurationChange(it * 6f) },
-        modifier = modifier.width(150.dp),
-        colors = SliderDefaults.colors(
-            thumbColor = PendulumUI.BTN_FG_COLOR.toComposeColor(),
-            activeTrackColor = PendulumUI.BTN_FG_COLOR.toComposeColor(),
-            inactiveTrackColor = PendulumUI.BTN_BG_COLOR.toComposeColor()
-        )
-    )
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .background(if (isPlaying) PAUSE_COLOR else PLAY_COLOR)
+            .clickable(onClick = onClick)
+    ) {
+        if (isPlaying) {
+            // Pause icon (two vertical bars)
+            Text("⏸", color = Color.Black, fontSize = 18.sp)
+        } else {
+            // Play icon (triangle)
+            Text("▶", color = Color.Black, fontSize = 18.sp)
+        }
+    }
 }
 
 @Composable

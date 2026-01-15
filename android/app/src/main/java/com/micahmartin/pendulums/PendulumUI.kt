@@ -49,7 +49,7 @@ object PendulumUI {
     const val ANGLE_DISPLAY_ROW_WIDTH = 180f
 
     // Default state values
-    const val DEFAULT_ZOOM = 1.0f
+    const val DEFAULT_ZOOM = 1.5f
     const val DEFAULT_TRAIL_DURATION = 3.0f
 
     // Clojure functions
@@ -74,8 +74,10 @@ object PendulumUI {
         return PENDULUM_COLORS[index % PENDULUM_COLORS.size]
     }
 
-    fun getPivotPosition(canvasWidth: Float): Pair<Float, Float> {
-        return Pair(canvasWidth / 2f, PIVOT_Y_OFFSET)
+    fun getPivotPosition(canvasWidth: Float, canvasHeight: Float = 0f): Pair<Float, Float> {
+        // Use canvas height to position pivot at 1/3 from top for better vertical centering
+        val pivotY = if (canvasHeight > 0f) canvasHeight / 3f else PIVOT_Y_OFFSET
+        return Pair(canvasWidth / 2f, pivotY)
     }
 
     fun worldToScreen(
@@ -84,11 +86,19 @@ object PendulumUI {
         zoom: Float,
         panX: Float,
         panY: Float,
-        canvasWidth: Float
+        canvasWidth: Float,
+        canvasHeight: Float = 0f
     ): Pair<Float, Float> {
-        val (pivotX, pivotY) = getPivotPosition(canvasWidth)
-        val screenX = ((pivotX + worldX * SCALE) * zoom) + panX
-        val screenY = ((pivotY - worldY * SCALE) * zoom) + panY
+        val (pivotX, pivotY) = getPivotPosition(canvasWidth, canvasHeight)
+        // Calculate center of screen for zoom origin
+        val centerX = canvasWidth / 2f
+        val centerY = if (canvasHeight > 0f) canvasHeight / 2f else pivotY
+        // Calculate unzoomed position
+        val unzoomedX = pivotX + worldX * SCALE
+        val unzoomedY = pivotY - worldY * SCALE
+        // Zoom around screen center
+        val screenX = centerX + (unzoomedX - centerX) * zoom + panX
+        val screenY = centerY + (unzoomedY - centerY) * zoom + panY
         return Pair(screenX, screenY)
     }
 
@@ -98,19 +108,28 @@ object PendulumUI {
         zoom: Float,
         panX: Float,
         panY: Float,
-        canvasWidth: Float
+        canvasWidth: Float,
+        canvasHeight: Float = 0f
     ): Pair<Float, Float> {
-        val (pivotX, pivotY) = getPivotPosition(canvasWidth)
-        val unzoomedX = (screenX - panX) / zoom
-        val unzoomedY = (screenY - panY) / zoom
+        val (pivotX, pivotY) = getPivotPosition(canvasWidth, canvasHeight)
+        val centerX = canvasWidth / 2f
+        val centerY = if (canvasHeight > 0f) canvasHeight / 2f else pivotY
+        // Reverse the zoom-around-center transformation
+        val unzoomedX = (screenX - panX - centerX) / zoom + centerX
+        val unzoomedY = (screenY - panY - centerY) / zoom + centerY
         val worldX = (unzoomedX - pivotX) / SCALE
         val worldY = (pivotY - unzoomedY) / SCALE
         return Pair(worldX, worldY)
     }
 
-    fun pivotScreenPos(zoom: Float, panX: Float, panY: Float, canvasWidth: Float): Pair<Float, Float> {
-        val (pivotX, pivotY) = getPivotPosition(canvasWidth)
-        return Pair(pivotX * zoom + panX, pivotY * zoom + panY)
+    fun pivotScreenPos(zoom: Float, panX: Float, panY: Float, canvasWidth: Float, canvasHeight: Float = 0f): Pair<Float, Float> {
+        val (pivotX, pivotY) = getPivotPosition(canvasWidth, canvasHeight)
+        val centerX = canvasWidth / 2f
+        val centerY = if (canvasHeight > 0f) canvasHeight / 2f else pivotY
+        // Apply zoom around screen center
+        val screenX = centerX + (pivotX - centerX) * zoom + panX
+        val screenY = centerY + (pivotY - centerY) * zoom + panY
+        return Pair(screenX, screenY)
     }
 
     fun angleFromPivot(pivotX: Float, pivotY: Float, mouseX: Float, mouseY: Float): Float {
