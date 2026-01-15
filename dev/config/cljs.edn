@@ -19,7 +19,7 @@
                  :infer-externs  true
                  :optimizations  :advanced
                  :output-dir     "web/cljs/"
-                 :output-to      "web/cljs/pendulums.js"
+                 :output-to      "docs/pendulums.js"
                  :pretty-print   false
                  ;:pretty-print   true
                  ;:pseudo-names   true
@@ -32,7 +32,7 @@
                  :infer-externs  true
                  :optimizations  :whitespace
                  :output-dir     "web/cljs/"
-                 :output-to      "web/cljs/pendulums.js"
+                 :output-to      "docs/pendulums.js"
                  :pretty-print   true
                  :pseudo-names   true
                  :sources        ["src/cljc"]
