@@ -164,28 +164,30 @@
   [^Graphics2D g system editing-angle]
   (let [pendulums (:pendulums system)
         font (Font. "Monospaced" Font/PLAIN 14)
-        header-y (+ ui/angle-display-padding ui/angle-display-line-height)]
+        header-y (int (+ ui/angle-display-padding ui/angle-display-line-height))
+        ^String header-text "Pendulum    Angle"]
     (.setFont g font)
     ;; Header
     (.setColor g text-color)
-    (.drawString g "Pendulum    Angle" ui/angle-display-padding header-y)
+    (.drawString g header-text (int ui/angle-display-padding) header-y)
     ;; Draw each pendulum's angle
     (doseq [[idx {:keys [theta]}] (map-indexed vector pendulums)]
-      (let [y (+ header-y (* (inc idx) ui/angle-display-line-height))
+      (let [y (int (+ header-y (* (inc idx) ui/angle-display-line-height)))
             color (nth colors (mod idx (count colors)))
             display-angle (ui/normalize-angle theta)
-            angle-str (format "%7.2f°" display-angle)
+            ^String angle-str (format "%7.2f°" display-angle)
             is-editing (= idx editing-angle)]
         ;; Draw color indicator
         (.setColor g color)
-        (.fillRect g ui/angle-display-padding (- y 10) 12 12)
+        (.fillRect g (int ui/angle-display-padding) (int (- y 10)) (int 12) (int 12))
         (.setColor g bob-outline-color)
-        (.drawRect g ui/angle-display-padding (- y 10) 12 12)
+        (.drawRect g (int ui/angle-display-padding) (int (- y 10)) (int 12) (int 12))
         ;; Draw label and angle (skip angle value if editing)
         (.setColor g text-color)
-        (if is-editing
-          (.drawString g (format "    %d      " (inc idx)) (+ ui/angle-display-padding 12) y)
-          (.drawString g (format "    %d      %s" (inc idx) angle-str) (+ ui/angle-display-padding 12) y))))))
+        (let [^String label-str (if is-editing
+                                  (format "    %d      " (inc idx))
+                                  (format "    %d      %s" (inc idx) angle-str))]
+          (.drawString g label-str (int (+ ui/angle-display-padding 12)) y))))))
 
 ;; -----------------------------------------------------------------------------
 ;; UI Components
@@ -255,7 +257,7 @@
 
 (defn create-circular-button
   "Creates a circular button with custom rendering."
-  [diameter bg-color fg-color text on-click]
+  [diameter bg-color fg-color ^String text on-click]
   (let [btn (proxy [JButton] []
               (paintComponent [^Graphics2D g]
                 (.setRenderingHint g RenderingHints/KEY_ANTIALIASING RenderingHints/VALUE_ANTIALIAS_ON)
@@ -263,11 +265,11 @@
                       h (.getHeight this)
                       bg (if (.getModel this)
                            (if (.isPressed (.getModel this))
-                             (.darker bg-color)
+                             (.darker ^Color bg-color)
                              bg-color)
                            bg-color)]
                   (.setColor g bg)
-                  (.fillOval g 0 0 (dec w) (dec h))
+                  (.fillOval g (int 0) (int 0) (int (dec w)) (int (dec h)))
                   (.setColor g fg-color)
                   (.setFont g (Font. "Dialog" Font/PLAIN 18))
                   (let [fm (.getFontMetrics g)
@@ -288,17 +290,17 @@
 
 (defn create-small-button
   "Creates a small rectangular button for +/- controls."
-  [text on-click]
+  [^String text on-click]
   (let [btn (proxy [JButton] []
               (paintComponent [^Graphics2D g]
                 (.setRenderingHint g RenderingHints/KEY_ANTIALIASING RenderingHints/VALUE_ANTIALIAS_ON)
                 (let [w (.getWidth this)
                       h (.getHeight this)
                       bg (if (and (.getModel this) (.isPressed (.getModel this)))
-                           (.darker overlay-btn-color)
+                           (.darker ^Color overlay-btn-color)
                            overlay-btn-color)]
                   (.setColor g bg)
-                  (.fillRoundRect g 0 0 (dec w) (dec h) 6 6)
+                  (.fillRoundRect g (int 0) (int 0) (int (dec w)) (int (dec h)) (int 6) (int 6))
                   (.setColor g Color/WHITE)
                   (.setFont g (Font. "Dialog" Font/BOLD 14))
                   (let [fm (.getFontMetrics g)
@@ -351,7 +353,7 @@
                   (proxy-super paintComponent g)
                   (let [{:keys [system running? zoom pan trails trail-duration canvas-width canvas-height editing-angle]} @*state]
                     (.setColor g bg-color)
-                    (.fillRect g 0 0 canvas-width canvas-height)
+                    (.fillRect g (int 0) (int 0) (int canvas-width) (int canvas-height))
                     (draw-trails g trails trail-duration zoom pan canvas-width)
                     (draw-pendulum-system g system running? zoom pan canvas-width)
                     (draw-angle-display g system editing-angle))))
@@ -396,11 +398,11 @@
                           running (:running? @*state)
                           base-color (if running pause-color play-color)
                           bg (if (and (.getModel this) (.isPressed (.getModel this)))
-                               (.darker base-color)
+                               (.darker ^Color base-color)
                                base-color)
-                          symbol (if running "⏸" "▶")]
+                          ^String symbol (if running "⏸" "▶")]
                       (.setColor g bg)
-                      (.fillOval g 0 0 (dec w) (dec h))
+                      (.fillOval g (int 0) (int 0) (int (dec w)) (int (dec h)))
                       (.setColor g Color/BLACK)
                       (.setFont g (Font. "Dialog" Font/PLAIN 18))
                       (let [fm (.getFontMetrics g)
