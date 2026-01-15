@@ -82,6 +82,7 @@ data class PendulumState(
 fun PendulumScreen() {
     var state by remember { mutableStateOf(PendulumState()) }
     var initialized by remember { mutableStateOf(false) }
+    var showInfo by remember { mutableStateOf(false) }
 
     // Initialize Clojure runtime
     LaunchedEffect(Unit) {
@@ -189,19 +190,24 @@ fun PendulumScreen() {
                 .padding(top = topPadding)
         )
 
-        // Top right: Center button
-        CenterButton(
-            onClick = {
-                state = state.copy(
-                    zoom = PendulumUI.DEFAULT_ZOOM,
-                    panX = 0f,
-                    panY = 0f
-                )
-            },
+        // Top right: Center button and Info button
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(top = topPadding, end = 10.dp)
-        )
+        ) {
+            CenterButton(
+                onClick = {
+                    state = state.copy(
+                        zoom = PendulumUI.DEFAULT_ZOOM,
+                        panX = 0f,
+                        panY = 0f
+                    )
+                }
+            )
+            InfoButton(onClick = { showInfo = true })
+        }
 
         // Bottom center: Play/Pause button
         PlayPauseButton(
@@ -239,6 +245,11 @@ fun PendulumScreen() {
                     )
                 }
             }
+        }
+
+        // Info modal
+        if (showInfo) {
+            InfoModal(onDismiss = { showInfo = false })
         }
     }
 }
@@ -680,6 +691,70 @@ private fun CenterButton(
     ) {
         Text("◎", color = PendulumUI.BTN_FG_COLOR.toComposeColor(), fontSize = 18.sp)
     }
+}
+
+@Composable
+private fun InfoButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(PendulumUI.BTN_BG_COLOR.toComposeColor().copy(alpha = 0.8f))
+            .clickable(onClick = onClick)
+    ) {
+        Text("i", color = PendulumUI.BTN_FG_COLOR.toComposeColor(), fontSize = 18.sp)
+    }
+}
+
+@Composable
+private fun InfoModal(
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF1e1e1e),
+        title = {
+            Text(
+                "Pendulum Simulator",
+                color = Color.White,
+                fontSize = 20.sp
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "A physics simulation of coupled pendulums demonstrating chaotic motion.",
+                    color = PendulumUI.TEXT_COLOR.toComposeColor(),
+                    fontSize = 14.sp
+                )
+                Text(
+                    "Controls",
+                    color = Color.White,
+                    fontSize = 14.sp
+                )
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(start = 8.dp)
+                ) {
+                    Text("• Drag bobs to reposition (when paused)", color = PendulumUI.TEXT_COLOR.toComposeColor(), fontSize = 14.sp)
+                    Text("• Pinch to zoom in/out", color = PendulumUI.TEXT_COLOR.toComposeColor(), fontSize = 14.sp)
+                    Text("• Tap angles to edit directly", color = PendulumUI.TEXT_COLOR.toComposeColor(), fontSize = 14.sp)
+                    Text("• +/- buttons to add or remove pendulums", color = PendulumUI.TEXT_COLOR.toComposeColor(), fontSize = 14.sp)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close", color = PendulumUI.BTN_FG_COLOR.toComposeColor())
+            }
+        }
+    )
 }
 
 @Composable
