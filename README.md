@@ -18,6 +18,10 @@ pendulums behave.
 There is always a "root" pendulum.  Additional pendulums are added such that the pivot of the new pendulum is attached
 to the bob of the last pendulum.  Arms are weightless and the bob of each pendulum is 1kg.
 
+## Vibe Coding
+
+This was perhaps my first true foray into "Vibe Coding".  Using Claude Code and [Beads](https://github.com/steveyegge/beads), I acted as the Project Owner writing requirements and let Claude do almost all the coding.  Claude required some technical guidance which I provided in the form of TODOs in the code. Claude handled my suggestions surprisingly well.  Together we created a non-trivial decoupled architecture with moderately comprehensive tests.
+
 ## Development Stack
 
 - Language: Clojure
