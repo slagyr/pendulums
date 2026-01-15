@@ -3,6 +3,9 @@
 /.idea
 /.grok
 /.claude
+android/.gradle/
+android/.idea/
+android/app/build/
 
 # Clojure
 .cpcache/

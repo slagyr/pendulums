@@ -2,6 +2,14 @@
 
 A coupled pendulum simulator.  
 
+<table>
+  <tr>
+    <td><img src="https://github.com/slagyr/pendulums/blob/master/assets/android.png?raw=true" alt="Android" width="300"/></td>
+    <td><img src="https://github.com/slagyr/pendulums/blob/master/assets/desktop.png?raw=true" alt="Desktop Swing" width="300"/></td>
+    <td><img src="https://github.com/slagyr/pendulums/blob/master/assets/web.png?raw=true" alt="Web" width="300"/></td>
+  </tr>
+</table>
+
 ## Overview
 
 The use has the ability to set up a coupled pendulum scenario, and then activate the physics engine to watch how the 
@@ -16,13 +24,14 @@ to the bob of the last pendulum.  Arms are weightless and the bob of each pendul
 - Unit Testing: Speclj
 - Web Framework: Reagent with c3kit/scaffold
 - GUI Framework: Swing
+- Android: Kotlin / Jetpack Compose
 
 ## Architecture
 
 ### Engine
 
 The large majority of code is a written as a reusable library.  This component includes not only the physics engine, 
-but also the business logic of the application.  It is shared among the user interfaces (Web & GUI).
+but also the business logic of the application.  It is shared among the user interfaces (Web, Desktop, Android).
 
 ### Web UI
 
@@ -72,13 +81,7 @@ clj -T:build android-jar
 
 # Copy to Android libs directory
 cp target/pendulums-engine-1.0.0.jar android/app/libs/
-```
 
-Rebuild the JAR whenever you modify the engine (`src/cljc/`) or UI (`src/clj/.../ui.clj`) code.
-
-#### Building and Running the App
-
-```shell
 # build the debug APK
 cd android && ./gradlew assembleDebug
 
@@ -89,4 +92,3 @@ cd android && ./gradlew installDebug
 # Open the android/ directory in Android Studio and click Run
 ```
 
-The APK will be output to `android/app/build/outputs/apk/debug/app-debug.apk`.
