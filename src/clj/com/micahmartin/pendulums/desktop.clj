@@ -196,6 +196,63 @@
 (def pause-color (Color. 245 158 11))    ; Orange for pause
 (def overlay-btn-color (Color. 64 64 64 200))  ; Semi-transparent gray
 
+(defn show-info-dialog!
+  "Shows an information dialog about the pendulum simulator."
+  [parent]
+  (let [dialog (javax.swing.JDialog. parent "About" true)
+        content-panel (JPanel.)
+        title-label (doto (JLabel. "Pendulum Simulator")
+                      (.setFont (Font. "Dialog" Font/BOLD 20))
+                      (.setForeground Color/WHITE)
+                      (.setAlignmentX java.awt.Component/LEFT_ALIGNMENT))
+        desc-label (doto (JLabel. "<html><body style='width: 280px'>A physics simulation of coupled pendulums demonstrating chaotic motion.</body></html>")
+                     (.setFont (Font. "Dialog" Font/PLAIN 14))
+                     (.setForeground (Color. 200 200 200))
+                     (.setAlignmentX java.awt.Component/LEFT_ALIGNMENT))
+        controls-label (doto (JLabel. "Controls")
+                         (.setFont (Font. "Dialog" Font/BOLD 14))
+                         (.setForeground Color/WHITE)
+                         (.setAlignmentX java.awt.Component/LEFT_ALIGNMENT))
+        controls-list (doto (JLabel. (str "<html><body style='width: 280px'>"
+                                          "<ul style='margin-left: 15px'>"
+                                          "<li>Drag bobs to reposition (when paused)</li>"
+                                          "<li>Scroll to zoom in/out</li>"
+                                          "<li>Click angles to edit directly</li>"
+                                          "<li>+/- buttons to add or remove pendulums</li>"
+                                          "</ul></body></html>"))
+                        (.setFont (Font. "Dialog" Font/PLAIN 14))
+                        (.setForeground (Color. 200 200 200))
+                        (.setAlignmentX java.awt.Component/LEFT_ALIGNMENT))
+        close-btn (doto (JButton. "Close")
+                    (.setBackground (Color. 64 64 64))
+                    (.setForeground Color/WHITE)
+                    (.setFocusPainted false)
+                    (.setAlignmentX java.awt.Component/LEFT_ALIGNMENT)
+                    (.addActionListener
+                      (reify ActionListener
+                        (actionPerformed [_ _] (.dispose dialog)))))]
+    ;; Configure content panel
+    (doto content-panel
+      (.setLayout (javax.swing.BoxLayout. content-panel javax.swing.BoxLayout/Y_AXIS))
+      (.setBackground (Color. 30 30 30))
+      (.setBorder (javax.swing.BorderFactory/createEmptyBorder 24 24 24 24))
+      (.add title-label)
+      (.add (javax.swing.Box/createRigidArea (Dimension. 0 16)))
+      (.add desc-label)
+      (.add (javax.swing.Box/createRigidArea (Dimension. 0 16)))
+      (.add controls-label)
+      (.add (javax.swing.Box/createRigidArea (Dimension. 0 8)))
+      (.add controls-list)
+      (.add (javax.swing.Box/createRigidArea (Dimension. 0 20)))
+      (.add close-btn))
+    ;; Configure dialog
+    (doto dialog
+      (.setContentPane content-panel)
+      (.setSize 400 320)
+      (.setLocationRelativeTo parent)
+      (.setResizable false)
+      (.setVisible true))))
+
 (defn create-circular-button
   "Creates a circular button with custom rendering."
   [diameter bg-color fg-color text on-click]
@@ -323,7 +380,11 @@
         center-btn (create-circular-button 36 overlay-btn-color Color/WHITE "◎"
                      (fn []
                        (ui/center-view! *state)
-                       (.repaint panel)))]
+                       (.repaint panel)))
+        info-btn (create-circular-button 36 overlay-btn-color Color/WHITE "i"
+                   (fn []
+                     (when-let [frame (SwingUtilities/getWindowAncestor panel)]
+                       (show-info-dialog! frame))))]
 
     ;; Create play button with dynamic color
     (reset! play-btn
@@ -377,6 +438,7 @@
     (.add panel angle-input-field)
     (.add panel @play-btn)
     (.add panel center-btn)
+    (.add panel info-btn)
     (.add panel minus-btn)
     (.add panel count-label)
     (.add panel plus-btn)
@@ -388,7 +450,7 @@
     (.add panel trail-label)
 
     ;; Store references for repositioning
-    (let [trail-text-label (.. panel (getComponent 6))]  ; "Trail:" label
+    (let [trail-text-label (.. panel (getComponent 7))]  ; "Trail:" label (index shifted by info-btn)
 
       ;; Add key listener to the input field
       (.addKeyListener angle-input-field
@@ -461,8 +523,10 @@
                 ;; Reposition overlay controls
                 ;; Play button: bottom center
                 (.setBounds @play-btn (- (/ w 2) 24) (- h 68) 48 48)
-                ;; Center button: top right
-                (.setBounds center-btn (- w 46) 10 36 36)
+                ;; Center button: top right (left of info button)
+                (.setBounds center-btn (- w 90) 10 36 36)
+                ;; Info button: top right corner
+                (.setBounds info-btn (- w 46) 10 36 36)
                 ;; Add/remove controls: top center
                 (let [total-width 120  ; approx width of - count +
                       start-x (- (/ w 2) (/ total-width 2))]
@@ -479,7 +543,8 @@
       (let [w ui/default-canvas-width
             h ui/default-canvas-height]
         (.setBounds @play-btn (- (/ w 2) 24) (- h 68) 48 48)
-        (.setBounds center-btn (- w 46) 10 36 36)
+        (.setBounds center-btn (- w 90) 10 36 36)
+        (.setBounds info-btn (- w 46) 10 36 36)
         (let [total-width 120
               start-x (- (/ w 2) (/ total-width 2))]
           (.setBounds minus-btn (int start-x) 10 28 24)
