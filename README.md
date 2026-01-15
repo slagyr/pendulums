@@ -2,6 +2,8 @@
 
 A coupled pendulum simulator that lets you explore their potentially chaotic behavior.
 
+### [TRY IT! at http://micahmartin.com/pendulums/](http://micahmartin.com/pendulums/)
+
 <table>
   <tr>
     <td><img src="https://github.com/slagyr/pendulums/blob/master/assets/android.png?raw=true" alt="Android" width="300"/></td>
