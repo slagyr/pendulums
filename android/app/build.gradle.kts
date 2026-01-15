@@ -63,9 +63,7 @@ dependencies {
     // Material 3 theme support for XML theme fallback
     implementation("com.google.android.material:material:1.11.0")
 
-    // Clojure runtime
-    implementation("org.clojure:clojure:1.12.0")
-
-    // AOT-compiled pendulums engine JAR (copy from target/ after running: clj -T:build jar)
+    // AOT-compiled pendulums engine JAR with bundled Clojure runtime
+    // Build with: clj -T:build android-jar
     implementation(files("libs/pendulums-engine-1.0.0.jar"))
 }
