@@ -32,6 +32,10 @@ Built using Reagent.  This is a static SPA (Single Page Application) allowing th
 
 Built using Swing allowing the app to be run as a desktop application.
 
+### Android App
+
+Built using Jetpack Compose with the physics engine compiled as an AOT Clojure JAR.
+
 ## Development
 
 ### Common commands
@@ -49,5 +53,24 @@ clj -M:test:cljs
 open web/index.html
 
 # run the desktop app
-clj -M:gui 
+clj -M:gui
 ```
+
+### Android
+
+Prerequisites:
+- Android Studio (or Android SDK with command line tools)
+- Java 17+
+
+```shell
+# build the debug APK
+cd android && ./gradlew assembleDebug
+
+# install on connected device/emulator
+cd android && ./gradlew installDebug
+
+# run from Android Studio
+# Open the android/ directory in Android Studio and click Run
+```
+
+The APK will be output to `android/app/build/outputs/apk/debug/app-debug.apk`.
